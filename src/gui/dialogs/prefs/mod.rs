@@ -22,6 +22,24 @@ glib::wrapper! {
             gtk::Native, gtk::Root, gtk::ShortcutManager;
 }
 
+fn rgba_from_gdk(color: gtk::gdk::RGBA) -> RGBA<u8> {
+    RGBA {
+        red: (color.red() * 255.0).round() as u8,
+        green: (color.green() * 255.0).round() as u8,
+        blue: (color.blue() * 255.0).round() as u8,
+        alpha: (color.alpha() * 255.0).round() as u8,
+    }
+}
+
+fn rgba_to_gdk(color: RGBA<u8>) -> gtk::gdk::RGBA {
+    gtk::gdk::RGBA::new(
+        f32::from(color.red) / 255.0,
+        f32::from(color.green) / 255.0,
+        f32::from(color.blue) / 255.0,
+        f32::from(color.alpha) / 255.0,
+    )
+}
+
 impl Default for Prefs {
     fn default() -> Self {
         Self::new()
@@ -30,8 +48,7 @@ impl Default for Prefs {
 
 impl Prefs {
     pub fn new() -> Self {
-        let dlg: Self =
-            Object::new(&[("use-header-bar", &1.to_value())]);
+        let dlg: Self = Object::builder().property("use-header-bar", 1).build();
         let dialog = dlg.clone();
         dlg.imp().download_scheme.connect_changed(move |_| {
             if let Some(scheme) = dialog.download_scheme() {
@@ -61,7 +78,7 @@ impl Prefs {
     }
 
     pub fn homepage(&self) -> String {
-        self.imp().homepage.buffer().text()
+        self.imp().homepage.buffer().text().to_string()
     }
 
     pub fn set_homepage(&self, page: &str) {
@@ -215,67 +232,67 @@ impl Prefs {
     }
 
     pub fn fg_color(&self) -> RGBA<u8> {
-        RGBA::from(self.imp().fg_color.rgba())
+        rgba_from_gdk(self.imp().fg_color.rgba())
     }
 
     pub fn set_fg_color(&self, color: RGBA<u8>) {
-        self.imp().fg_color.set_rgba(&color.into());
+        self.imp().fg_color.set_rgba(&rgba_to_gdk(color));
     }
 
     pub fn bg_color(&self) -> RGBA<u8> {
-        RGBA::from(self.imp().bg_color.rgba())
+        rgba_from_gdk(self.imp().bg_color.rgba())
     }
 
     pub fn set_bg_color(&self, color: RGBA<u8>) {
-        self.imp().bg_color.set_rgba(&color.into());
+        self.imp().bg_color.set_rgba(&rgba_to_gdk(color));
     }
 
     pub fn pre_fg_color(&self) -> RGBA<u8> {
-        RGBA::from(self.imp().pre_fg_color.rgba())
+        rgba_from_gdk(self.imp().pre_fg_color.rgba())
     }
 
     pub fn set_pre_fg_color(&self, color: RGBA<u8>) {
-        self.imp().pre_fg_color.set_rgba(&color.into());
+        self.imp().pre_fg_color.set_rgba(&rgba_to_gdk(color));
     }
 
     pub fn pre_bg_color(&self) -> RGBA<u8> {
-        RGBA::from(self.imp().pre_bg_color.rgba())
+        rgba_from_gdk(self.imp().pre_bg_color.rgba())
     }
 
     pub fn set_pre_bg_color(&self, color: RGBA<u8>) {
-        self.imp().pre_bg_color.set_rgba(&color.into());
+        self.imp().pre_bg_color.set_rgba(&rgba_to_gdk(color));
     }
 
     pub fn quote_fg_color(&self) -> RGBA<u8> {
-        RGBA::from(self.imp().quote_fg_color.rgba())
+        rgba_from_gdk(self.imp().quote_fg_color.rgba())
     }
 
     pub fn set_quote_fg_color(&self, color: RGBA<u8>) {
-        self.imp().quote_fg_color.set_rgba(&color.into());
+        self.imp().quote_fg_color.set_rgba(&rgba_to_gdk(color));
     }
 
     pub fn quote_bg_color(&self) -> RGBA<u8> {
-        RGBA::from(self.imp().quote_bg_color.rgba())
+        rgba_from_gdk(self.imp().quote_bg_color.rgba())
     }
 
     pub fn set_quote_bg_color(&self, color: RGBA<u8>) {
-        self.imp().quote_bg_color.set_rgba(&color.into());
+        self.imp().quote_bg_color.set_rgba(&rgba_to_gdk(color));
     }
 
     pub fn link_color(&self) -> RGBA<u8> {
-        RGBA::from(self.imp().link_color.rgba())
+        rgba_from_gdk(self.imp().link_color.rgba())
     }
 
     pub fn set_link_color(&self, color: RGBA<u8>) {
-        self.imp().link_color.set_rgba(&color.into());
+        self.imp().link_color.set_rgba(&rgba_to_gdk(color));
     }
 
     pub fn hover_color(&self) -> RGBA<u8> {
-        RGBA::from(self.imp().hover_color.rgba())
+        rgba_from_gdk(self.imp().hover_color.rgba())
     }
 
     pub fn set_hover_color(&self, color: RGBA<u8>) {
-        self.imp().hover_color.set_rgba(&color.into());
+        self.imp().hover_color.set_rgba(&rgba_to_gdk(color));
     }
 
     pub fn colors(&self) -> Colors {

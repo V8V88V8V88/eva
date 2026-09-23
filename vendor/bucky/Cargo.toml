@@ -1,0 +1,42 @@
+[package]
+edition = "2021"
+rust-version = "1.92"
+name = "bucky"
+version = "0.1.0"
+description = "A Smolweb client library"
+authors = ["Nathan Fisher"]
+repository = "https://codeberg.org/jeang3nie/bucky"
+keywords = ["gemini"]
+license = "LGPL-3.0"
+
+[workspace]
+members = [
+    "bucky_common", "bucky_data", "bucky_file", "bucky_finger", "bucky_gemini",
+    "bucky_gopher", "bucky_spartan"
+]
+
+[workspace.package]
+rust-version = "1.92"
+
+[workspace.dependencies]
+tree_magic_mini = "3.2"
+url = "2.5"
+urlencoding = "2.1"
+
+[features]
+default = ["file", "gemini"]
+data = ["dep:bucky-data"]
+file = ["dep:bucky-file"]
+finger = ["dep:bucky-finger"]
+gemini = ["dep:bucky-gemini"]
+gopher = ["dep:bucky-gopher"]
+spartan = ["dep:bucky-spartan"]
+
+[dependencies]
+bucky-common = { path = "bucky_common" }
+bucky-data = { path = "bucky_data", optional = true }
+bucky-file = { path = "bucky_file", optional = true }
+bucky-finger = { path = "bucky_finger", optional = true }
+bucky-gemini = { path = "bucky_gemini", optional = true }
+bucky-gopher = { path = "bucky_gopher", optional = true }
+bucky-spartan = { path = "bucky_spartan", optional = true }

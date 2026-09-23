@@ -9,7 +9,7 @@ use gtk::{
 glib::wrapper! {
     pub struct Label(ObjectSubclass<imp::Label>)
         @extends gtk::Box, gtk::Widget,
-        @implements gtk::Buildable;
+        @implements gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget, gtk::Orientable;
 }
 
 impl Default for Label {
@@ -20,7 +20,9 @@ impl Default for Label {
 
 impl Label {
     pub fn new() -> Self {
-        Object::new(&[("orientation", &gtk::Orientation::Horizontal)])
+        Object::builder()
+            .property("orientation", gtk::Orientation::Horizontal)
+            .build()
     }
 
     pub fn close_button(&self) -> gtk::Button {

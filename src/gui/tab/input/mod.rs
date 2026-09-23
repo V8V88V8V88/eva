@@ -9,7 +9,8 @@ use gtk::{
 glib::wrapper! {
     pub struct Input(ObjectSubclass<imp::Input>)
         @extends gtk::Popover, gtk::Widget,
-        @implements gtk::Buildable;
+        @implements gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget,
+            gtk::Native, gtk::ShortcutManager;
 }
 
 impl Default for Input {
@@ -20,7 +21,7 @@ impl Default for Input {
 
 impl Input {
     pub fn new() -> Self {
-        Object::new(&[])
+        Object::new()
     }
 
     pub fn entry(&self) -> gtk::Entry {

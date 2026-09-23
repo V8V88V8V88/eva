@@ -6,6 +6,7 @@ homepage = "https://codeberg.org/jeang3nie/eva"
 repository = "https://codeberg.org/jeang3nie/eva"
 version = "0.4.1"
 edition = "2021"
+rust-version = "1.92"
 license = "GPL-3.0"
 keywords = ["gemini", "gopher", "gtk", "network"]
 categories = ["gui"]
@@ -13,14 +14,12 @@ categories = ["gui"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-#gemview = "0.5"
-gemview = { git = "https://codeberg.org/jeang3nie/gemview" }
+gemview = { path = "vendor/gemview" }
 mime2ext = "0.1"
 mime_open = "0.2"
-lazy_static = "1.4"
-fastrand = "1.7"
-toml = "0.5"
-url = "2.2"
+fastrand = "2.5"
+toml = "1.1"
+url = "2.5"
 urlencoding = "2.1"
 
 [dependencies.chrono]
@@ -28,12 +27,13 @@ version = "0.4"
 features = ["std", "serde"]
 
 [dependencies.gtk]
-version = "0.5"
+version = "0.11"
 package = "gtk4"
+features = ["v4_22"]
 
 [dependencies.rgba_simple]
-version = "0.8"
-features = ["gdk", "serde"]
+version = "0.10"
+features = ["serde"]
 
 [dependencies.serde]
 version = "1.0"

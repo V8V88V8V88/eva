@@ -4,15 +4,15 @@ use {
     super::{BookmarkEditor, Input},
     gtk::{
         glib::{self, Object},
+        prelude::{EditableExt, WidgetExt},
         subclass::prelude::*,
-        traits::{EditableExt, WidgetExt},
     },
 };
 
 glib::wrapper! {
     pub struct Controls(ObjectSubclass<imp::Controls>)
         @extends gtk::Box, gtk::Widget,
-        @implements gtk::Buildable;
+        @implements gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget, gtk::Orientable;
 }
 
 impl Default for Controls {
@@ -23,7 +23,7 @@ impl Default for Controls {
 
 impl Controls {
     pub fn new() -> Self {
-        Object::new(&[])
+        Object::new()
     }
 
     pub fn set_back_button_sensitive(&self, sensitive: bool) {

@@ -32,7 +32,7 @@ impl Default for Tab {
         let name: String = std::iter::repeat_with(fastrand::alphanumeric)
             .take(10)
             .collect();
-        let tab = gtk::builders::BoxBuilder::new()
+        let tab = gtk::Box::builder()
             .orientation(gtk::Orientation::Vertical)
             .name(&name)
             .build();
@@ -52,7 +52,7 @@ impl Default for Tab {
             .build();
         upload.add_button("Accept", gtk::ResponseType::Accept);
         upload.add_button("Cancel", gtk::ResponseType::Cancel);
-        let scroller = gtk::builders::ScrolledWindowBuilder::new()
+        let scroller = gtk::ScrolledWindow::builder()
             .hexpand(true)
             .vexpand(true)
             .propagate_natural_width(true)
@@ -90,19 +90,26 @@ impl Tab {
     }
 
     pub fn connect_signals(&self) {
-        self.controls
-            .addr_bar()
-            .connect_activate(clone!(@strong self as tab => move |bar| {
+        self.controls.addr_bar().connect_activate(clone!(
+            #[strong(rename_to = tab)]
+            self,
+            move |bar| {
                 let mut uri = String::from(bar.text());
                 uri = uri::uri(&mut uri);
                 tab.viewer.visit(&uri);
-            }));
-        self.viewer
-            .connect_page_load_redirect(clone!(@strong self as tab => move |_, uri| {
+            }
+        ));
+        self.viewer.connect_page_load_redirect(clone!(
+            #[strong(rename_to = tab)]
+            self,
+            move |_, uri| {
                 tab.controls.set_uri(&uri);
-            }));
-        self.viewer.connect_request_unsupported_scheme(
-            clone!(@strong self as tab => move |_, uri| {
+            }
+        ));
+        self.viewer.connect_request_unsupported_scheme(clone!(
+            #[strong(rename_to = tab)]
+            self,
+            move |_, uri| {
                 if let Some((scheme, _)) = uri.split_once(':') {
                     match scheme {
                         "eva" => tab.request_eva_page(&uri),
@@ -113,14 +120,16 @@ impl Tab {
                         }
                     }
                 }
-            }),
-        );
+            }
+        ));
         let upload = self.upload.clone();
         self.viewer.connect_request_upload(move |_viewer, _url| {
             upload.show();
         });
-        self.upload.connect_response(
-            clone!(@strong self.viewer as viewer => move |dlg,response| {
+        self.upload.connect_response(clone!(
+            #[strong(rename_to = viewer)]
+            self.viewer,
+            move |dlg, response| {
                 if response == gtk::ResponseType::Accept {
                     if let Some(file) = dlg.file() {
                         if let Some(path) = file.path() {
@@ -137,8 +146,8 @@ impl Tab {
                     }
                 }
                 dlg.hide();
-            }),
-        );
+            }
+        ));
     }
 
     pub fn request_input(&self, meta: &str, url: String, visibility: bool) {
@@ -165,12 +174,15 @@ impl Tab {
 
     pub fn set_fonts(&self) {
         let cfg = CONFIG.lock().unwrap().clone();
-        self.viewer.set_font_paragraph(cfg.fonts.pg.to_pango());
-        self.viewer.set_font_quote(cfg.fonts.quote.to_pango());
-        self.viewer.set_font_pre(cfg.fonts.pre.to_pango());
-        self.viewer.set_font_h1(cfg.fonts.h1.to_pango());
-        self.viewer.set_font_h2(cfg.fonts.h2.to_pango());
-        self.viewer.set_font_h3(cfg.fonts.h3.to_pango());
+        self.viewer
+            .set_font_paragraph(cfg.fonts.pg.to_pango().to_string());
+        self.viewer
+            .set_font_quote(cfg.fonts.quote.to_pango().to_string());
+        self.viewer
+            .set_font_pre(cfg.fonts.pre.to_pango().to_string());
+        self.viewer.set_font_h1(cfg.fonts.h1.to_pango().to_string());
+        self.viewer.set_font_h2(cfg.fonts.h2.to_pango().to_string());
+        self.viewer.set_font_h3(cfg.fonts.h3.to_pango().to_string());
     }
 
     pub fn update_bookmark_editor(&self) {

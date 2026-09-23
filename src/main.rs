@@ -1,6 +1,6 @@
 #![warn(clippy::all, clippy::pedantic)]
 #![doc = include_str!("../README.md")]
-use {lazy_static::lazy_static, std::sync::Mutex};
+use std::sync::{LazyLock, Mutex};
 /// Everything bookmark related
 pub mod bookmarks;
 /// Handles getting the configuration data to and from disk
@@ -12,16 +12,15 @@ pub mod history;
 /// Handles loading keybindings
 pub mod keys;
 
-lazy_static! {
-    static ref CONFIG: Mutex<config::Config> =
-        Mutex::new(config::Config::from_file().unwrap_or_default());
-    static ref BOOKMARKS: Mutex<bookmarks::Bookmarks> =
-        Mutex::new(match bookmarks::Bookmarks::from_file() {
-            Ok(b) => b.unwrap_or_default(),
-            Err(_) => bookmarks::Bookmarks::default(),
-        });
-    static ref SEARCH: gui::uri::Search = gui::uri::Search::load();
-}
+static CONFIG: LazyLock<Mutex<config::Config>> =
+    LazyLock::new(|| Mutex::new(config::Config::from_file().unwrap_or_default()));
+static BOOKMARKS: LazyLock<Mutex<bookmarks::Bookmarks>> = LazyLock::new(|| {
+    Mutex::new(match bookmarks::Bookmarks::from_file() {
+        Ok(b) => b.unwrap_or_default(),
+        Err(_) => bookmarks::Bookmarks::default(),
+    })
+});
+static SEARCH: LazyLock<gui::uri::Search> = LazyLock::new(gui::uri::Search::load);
 
 fn main() {
     gui::run();

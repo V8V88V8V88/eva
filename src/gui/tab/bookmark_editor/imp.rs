@@ -1,6 +1,5 @@
 use gtk::{
     glib::{self, subclass::InitializingObject},
-    prelude::*,
     subclass::prelude::*,
     CompositeTemplate,
 };

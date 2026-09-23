@@ -13,7 +13,7 @@ use {
         glib,
         glib::{char::Char, clone, OptionArg, OptionFlags},
         prelude::*,
-        Application, CssProvider, ResponseType, StyleContext,
+        Application, CssProvider, ResponseType,
     },
     mime2ext::mime2ext,
     std::{borrow::Cow, cell::RefCell, collections::HashMap, fs, path::PathBuf, rc::Rc},
@@ -72,14 +72,22 @@ impl Gui {
         self.notebook.set_tab_reorderable(&newtab.tab(), true);
         newtab.connect_signals();
         newtab.upload.set_transient_for(Some(&self.window));
-        newtab.label.close_button().connect_clicked(
-            clone!(@strong newtab as tab, @weak self.notebook as nb => move |_| {
+        newtab.label.close_button().connect_clicked(clone!(
+            #[strong(rename_to = tab)]
+            newtab,
+            #[weak(rename_to = nb)]
+            self.notebook,
+            move |_| {
                 let _name = tab.tab().widget_name().to_string();
                 nb.detach_tab(&tab.tab());
-            }),
-        );
-        newtab.viewer.connect_page_load_started(
-            clone!(@weak self.window as window, @strong newtab as tab => move |_, uri| {
+            }
+        ));
+        newtab.viewer.connect_page_load_started(clone!(
+            #[weak(rename_to = window)]
+            self.window,
+            #[strong(rename_to = tab)]
+            newtab,
+            move |_, uri| {
                 window.set_title(Some(&format!(
                     "{}-{} - [loading]",
                     env!("CARGO_PKG_NAME"),
@@ -88,14 +96,20 @@ impl Gui {
                 tab.controls.set_uri(&uri);
                 tab.set_label("[loading]", true);
                 tab.controls.set_reload_button_sensitive(false);
-            }),
-        );
-        newtab.viewer.connect_page_loaded(
-            clone!(@strong newtab as tab, @weak self.window as window => move |_, uri| {
+            }
+        ));
+        newtab.viewer.connect_page_loaded(clone!(
+            #[strong(rename_to = tab)]
+            newtab,
+            #[weak(rename_to = window)]
+            self.window,
+            move |_, uri| {
                 tab.controls.set_uri(&uri);
                 tab.controls.set_reload_button_sensitive(true);
-                tab.controls.set_back_button_sensitive(tab.viewer.has_previous());
-                tab.controls.set_forward_button_sensitive(tab.viewer.has_next());
+                tab.controls
+                    .set_back_button_sensitive(tab.viewer.has_previous());
+                tab.controls
+                    .set_forward_button_sensitive(tab.viewer.has_next());
                 tab.update_bookmark_editor();
                 if let Ok(url) = Url::parse(uri.as_str()) {
                     let scheme = url.scheme();
@@ -114,13 +128,19 @@ impl Gui {
                     )));
                     tab.set_label(host, false);
                 }
-            }),
-        );
-        newtab.viewer.connect_page_load_failed(
-            clone!(@strong newtab as tab, @weak self.window as window => move |_, err| {
+            }
+        ));
+        newtab.viewer.connect_page_load_failed(clone!(
+            #[strong(rename_to = tab)]
+            newtab,
+            #[weak(rename_to = window)]
+            self.window,
+            move |_, err| {
                 tab.controls.set_reload_button_sensitive(true);
-                tab.controls.set_back_button_sensitive(tab.viewer.has_previous());
-                tab.controls.set_forward_button_sensitive(tab.viewer.has_next());
+                tab.controls
+                    .set_back_button_sensitive(tab.viewer.has_previous());
+                tab.controls
+                    .set_forward_button_sensitive(tab.viewer.has_next());
                 if err.contains("unsupported-scheme") {
                     if let Ok(url) = Url::parse(tab.viewer.uri().as_str()) {
                         if let Some(host) = url.host_str() {
@@ -155,21 +175,27 @@ impl Gui {
                     env!("CARGO_PKG_NAME"),
                     env!("CARGO_PKG_VERSION"),
                 )));
-            }),
-        );
-        newtab
-            .viewer
-            .connect_request_new_tab(clone!(@strong self as gui => move |_, uri| {
+            }
+        ));
+        newtab.viewer.connect_request_new_tab(clone!(
+            #[strong(rename_to = gui)]
+            self,
+            move |_, uri| {
                 gui.new_tab(Some(&uri));
-            }));
+            }
+        ));
         if let Some(app) = self.window.application() {
             newtab.viewer.connect_request_new_window(move |_, uri| {
                 let gui = build_ui(&app);
                 gui.new_tab(Some(&uri));
             });
         }
-        newtab.viewer.connect_request_input(
-            clone!(@strong newtab as tab, @weak self.window as window => move |_viewer, meta, url| {
+        newtab.viewer.connect_request_input(clone!(
+            #[strong(rename_to = tab)]
+            newtab,
+            #[weak(rename_to = window)]
+            self.window,
+            move |_viewer, meta, url| {
                 if let Ok(url) = Url::parse(&url) {
                     if let Some(host) = url.host_str() {
                         tab.set_label(host, false);
@@ -183,10 +209,14 @@ impl Gui {
                 }
                 tab.controls.set_uri(&url);
                 tab.request_input(&meta, url, true);
-            }),
-        );
-        newtab.viewer.connect_request_input_sensitive(
-            clone!(@strong newtab as tab, @weak self.window as window => move |_viewer, meta, url| {
+            }
+        ));
+        newtab.viewer.connect_request_input_sensitive(clone!(
+            #[strong(rename_to = tab)]
+            newtab,
+            #[weak(rename_to = window)]
+            self.window,
+            move |_viewer, meta, url| {
                 if let Ok(url) = Url::parse(&url) {
                     if let Some(host) = url.host_str() {
                         tab.set_label(host, false);
@@ -200,13 +230,15 @@ impl Gui {
                 }
                 tab.controls.set_uri(&url);
                 tab.request_input(&meta, url, false);
-            }),
-        );
-        newtab.viewer.connect_request_download(
-            clone!(@strong self as gui => move |viewer, mime, filename| {
+            }
+        ));
+        newtab.viewer.connect_request_download(clone!(
+            #[strong(rename_to = gui)]
+            self,
+            move |viewer, mime, filename| {
                 gui.download(viewer, &mime, &filename);
-            }),
-        );
+            }
+        ));
     }
 
     fn download(&self, viewer: &GemView, mime: &str, filename: &str) {
@@ -224,8 +256,12 @@ impl Gui {
         match scheme {
             config::DownloadScheme::Ask => {
                 self.dialogs.save.set_current_name(&filename);
-                self.dialogs.save.connect_response(
-                    clone!(@weak viewer, @strong self as gui => move |dlg,response| {
+                self.dialogs.save.connect_response(clone!(
+                    #[weak]
+                    viewer,
+                    #[strong(rename_to = gui)]
+                    self,
+                    move |dlg, response| {
                         match response {
                             gtk::ResponseType::Accept => {
                                 if let Some(file) = dlg.file() {
@@ -235,19 +271,18 @@ impl Gui {
                                                 "File saved: {}",
                                                 path.display(),
                                             )),
-                                            Err(e) => gui.send_notification(&format!(
-                                                "Error: {}",
-                                                e,
-                                            )),
+                                            Err(e) => {
+                                                gui.send_notification(&format!("Error: {}", e,))
+                                            }
                                         }
                                     }
                                 }
                                 dlg.hide();
-                            },
+                            }
                             _ => dlg.hide(),
                         }
-                    }),
-                );
+                    }
+                ));
                 self.dialogs.save.show();
                 viewer.reload();
             }
@@ -312,9 +347,9 @@ impl Gui {
         if let Some(current) = self.notebook.current_page() {
             let pages = self.notebook.n_pages();
             if current == pages - 1 {
-                self.notebook.set_page(0);
+                self.notebook.set_current_page(Some(0));
             } else {
-                self.notebook.set_page((current + 1).try_into().unwrap());
+                self.notebook.set_current_page(Some(current + 1));
             }
         }
     }
@@ -323,9 +358,9 @@ impl Gui {
         if let Some(current) = self.current_page() {
             let pages = self.notebook.n_pages();
             if current == 0 {
-                self.notebook.set_page((pages - 1).try_into().unwrap());
+                self.notebook.set_current_page(Some(pages - 1));
             } else {
-                self.notebook.set_page((current - 1).try_into().unwrap());
+                self.notebook.set_current_page(Some(current - 1));
             }
         }
     }
@@ -443,8 +478,8 @@ impl Gui {
             .replace("DEFAULT_FG_COLOR", &context.color().to_string())
             .replace("ReducedRGBA", "rgba")
             .replace("RGBA", "rgba");
-        provider.load_from_data(css.as_bytes());
-        StyleContext::add_provider_for_display(
+        provider.load_from_data(&css);
+        gtk::style_context_add_provider_for_display(
             &Display::default().expect("Cannot connect to display"),
             &provider,
             gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
@@ -489,8 +524,12 @@ impl Gui {
                 }
             }
             self.dialogs.save.set_current_name(&filename);
-            self.dialogs.save.connect_response(
-                clone!(@weak viewer, @strong self as gui => move |dlg,response| {
+            self.dialogs.save.connect_response(clone!(
+                #[weak]
+                viewer,
+                #[strong(rename_to = gui)]
+                self,
+                move |dlg, response| {
                     match response {
                         gtk::ResponseType::Accept => {
                             if let Some(file) = dlg.file() {
@@ -500,19 +539,16 @@ impl Gui {
                                             "File saved: {}",
                                             path.display(),
                                         )),
-                                        Err(e) => gui.send_notification(&format!(
-                                            "Error: {}",
-                                            e,
-                                        )),
+                                        Err(e) => gui.send_notification(&format!("Error: {}", e,)),
                                     }
                                 }
                             }
                             dlg.hide();
-                        },
+                        }
                         _ => dlg.hide(),
                     }
-                }),
-            );
+                }
+            ));
             self.dialogs.save.show();
             viewer.reload();
         }
@@ -546,9 +582,9 @@ pub fn run() {
     application.connect_handle_local_options(move |_, dict| {
         if dict.contains("version") {
             println!("{}", env!("CARGO_PKG_VERSION"));
-            return 1;
+            return std::ops::ControlFlow::Break(gtk::glib::ExitCode::SUCCESS);
         }
-        -1
+        std::ops::ControlFlow::Continue(())
     });
 
     match application.register(Some(&Cancellable::new())) {
@@ -575,29 +611,51 @@ pub fn build_ui(app: &Application) -> Rc<Gui> {
     let config = CONFIG.lock().unwrap().clone();
     gui.set_css(&config.colors);
     gui.window.set_application(Some(app));
-    gui.notebook
-        .connect_page_removed(clone!(@weak gui, @strong config => move |nb,_page,_| {
+    gui.notebook.connect_page_removed(clone!(
+        #[weak]
+        gui,
+        #[strong]
+        config,
+        move |nb, _page, _| {
             gui.cleanup_tabs();
             let multi = config.general.show_tabs == config::ShowTabs::Multiple;
             match nb.n_pages() {
                 0 => gui.window.close(),
-                1 => if multi { nb.set_show_tabs(false); },
-                _ => if multi { nb.set_show_tabs(true); },
+                1 => {
+                    if multi {
+                        nb.set_show_tabs(false);
+                    }
+                }
+                _ => {
+                    if multi {
+                        nb.set_show_tabs(true);
+                    }
+                }
             }
-        }));
-    gui.notebook
-        .connect_page_added(clone!(@weak gui, @strong config => move |nb,_page,_| {
+        }
+    ));
+    gui.notebook.connect_page_added(clone!(
+        #[weak]
+        gui,
+        #[strong]
+        config,
+        move |nb, _page, _| {
             if nb.n_pages() > 1 && config.general.show_tabs == config::ShowTabs::Multiple {
                 nb.set_show_tabs(true);
             }
-        }));
-    gui.notebook
-        .connect_switch_page(clone!(@weak gui => move |_,_,page| {
+        }
+    ));
+    gui.notebook.connect_switch_page(clone!(
+        #[weak]
+        gui,
+        move |_, _, page| {
             gui.switch_tab(page);
-        }));
-    gui.dialogs
-        .preferences
-        .connect_response(clone!(@weak gui => move |dlg,res| {
+        }
+    ));
+    gui.dialogs.preferences.connect_response(clone!(
+        #[weak]
+        gui,
+        move |dlg, res| {
             if res == ResponseType::Accept {
                 if let Some(cfg) = gui.dialogs.preferences.config() {
                     *CONFIG.lock().unwrap() = cfg.clone();
@@ -606,7 +664,7 @@ pub fn build_ui(app: &Application) -> Rc<Gui> {
                     }
                     gui.set_general(&cfg.general);
                     gui.set_css(&cfg.colors);
-                    for (_,tab) in gui.tabs.borrow().clone() {
+                    for (_, tab) in gui.tabs.borrow().clone() {
                         tab.set_fonts();
                     }
                 } else {
@@ -614,7 +672,8 @@ pub fn build_ui(app: &Application) -> Rc<Gui> {
                 }
             }
             dlg.hide();
-        }));
+        }
+    ));
     gui.set_general(&config.general);
 
     gui.window.show();

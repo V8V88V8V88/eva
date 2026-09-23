@@ -47,152 +47,262 @@ pub fn add(gui: &Rc<Gui>, app: &gtk::Application) {
         gui.window.add_action(&action);
         match *name {
             "new_tab" => {
-                action.connect_activate(clone!(@strong gui => move |_,_| {
-                    gui.new_tab(None);
-                }));
+                action.connect_activate(clone!(
+                    #[strong]
+                    gui,
+                    move |_, _| {
+                        gui.new_tab(None);
+                    }
+                ));
             }
             "close_tab" => {
-                action.connect_activate(clone!(@weak gui => move |_,_| {
-                    gui.close_current_tab();
-                }));
+                action.connect_activate(clone!(
+                    #[weak]
+                    gui,
+                    move |_, _| {
+                        gui.close_current_tab();
+                    }
+                ));
             }
             "next_tab" => {
-                action.connect_activate(clone!(@weak gui => move |_,_| {
-                    gui.next_tab();
-                }));
+                action.connect_activate(clone!(
+                    #[weak]
+                    gui,
+                    move |_, _| {
+                        gui.next_tab();
+                    }
+                ));
             }
             "prev_tab" => {
-                action.connect_activate(clone!(@weak gui => move |_,_| {
-                    gui.prev_tab();
-                }));
+                action.connect_activate(clone!(
+                    #[weak]
+                    gui,
+                    move |_, _| {
+                        gui.prev_tab();
+                    }
+                ));
             }
             "tab1" => {
-                action.connect_activate(clone!(@weak gui => move |_,_| {
-                    gui.notebook.set_page(0);
-                }));
+                action.connect_activate(clone!(
+                    #[weak]
+                    gui,
+                    move |_, _| {
+                        gui.notebook.set_current_page(Some(0));
+                    }
+                ));
             }
             "tab2" => {
-                action.connect_activate(clone!(@weak gui => move |_,_| {
-                    gui.notebook.set_page(1);
-                }));
+                action.connect_activate(clone!(
+                    #[weak]
+                    gui,
+                    move |_, _| {
+                        gui.notebook.set_current_page(Some(1));
+                    }
+                ));
             }
             "tab3" => {
-                action.connect_activate(clone!(@weak gui => move |_,_| {
-                    gui.notebook.set_page(2);
-                }));
+                action.connect_activate(clone!(
+                    #[weak]
+                    gui,
+                    move |_, _| {
+                        gui.notebook.set_current_page(Some(2));
+                    }
+                ));
             }
             "tab4" => {
-                action.connect_activate(clone!(@weak gui => move |_,_| {
-                    gui.notebook.set_page(3);
-                }));
+                action.connect_activate(clone!(
+                    #[weak]
+                    gui,
+                    move |_, _| {
+                        gui.notebook.set_current_page(Some(3));
+                    }
+                ));
             }
             "tab5" => {
-                action.connect_activate(clone!(@weak gui => move |_,_| {
-                    gui.notebook.set_page(4);
-                }));
+                action.connect_activate(clone!(
+                    #[weak]
+                    gui,
+                    move |_, _| {
+                        gui.notebook.set_current_page(Some(4));
+                    }
+                ));
             }
             "tab6" => {
-                action.connect_activate(clone!(@weak gui => move |_,_| {
-                    gui.notebook.set_page(5);
-                }));
+                action.connect_activate(clone!(
+                    #[weak]
+                    gui,
+                    move |_, _| {
+                        gui.notebook.set_current_page(Some(5));
+                    }
+                ));
             }
             "tab7" => {
-                action.connect_activate(clone!(@weak gui => move |_,_| {
-                    gui.notebook.set_page(6);
-                }));
+                action.connect_activate(clone!(
+                    #[weak]
+                    gui,
+                    move |_, _| {
+                        gui.notebook.set_current_page(Some(6));
+                    }
+                ));
             }
             "tab8" => {
-                action.connect_activate(clone!(@weak gui => move |_,_| {
-                    gui.notebook.set_page(7);
-                }));
+                action.connect_activate(clone!(
+                    #[weak]
+                    gui,
+                    move |_, _| {
+                        gui.notebook.set_current_page(Some(7));
+                    }
+                ));
             }
             "tab9" => {
-                action.connect_activate(clone!(@weak gui => move |_,_| {
-                    gui.notebook.set_page(8);
-                }));
+                action.connect_activate(clone!(
+                    #[weak]
+                    gui,
+                    move |_, _| {
+                        gui.notebook.set_current_page(Some(8));
+                    }
+                ));
             }
             "reload" => {
-                action.connect_activate(clone!(@weak gui => move |_,_| {
-                    if let Err(e) = gui.reload_current_tab() {
-                        eprintln!("{}", e);
+                action.connect_activate(clone!(
+                    #[weak]
+                    gui,
+                    move |_, _| {
+                        if let Err(e) = gui.reload_current_tab() {
+                            eprintln!("{}", e);
+                        }
                     }
-                }));
+                ));
             }
             "go_home" => {
-                action.connect_activate(clone!(@weak gui => move |_,_| {
-                    if let Err(e) = gui.go_home() {
-                        eprintln!("{}", e);
+                action.connect_activate(clone!(
+                    #[weak]
+                    gui,
+                    move |_, _| {
+                        if let Err(e) = gui.go_home() {
+                            eprintln!("{}", e);
+                        }
                     }
-                }));
+                ));
             }
             "go_previous" => {
-                action.connect_activate(clone!(@weak gui => move |_,_| {
-                    if let Err(e) = gui.go_previous() {
-                        eprintln!("{}", e);
+                action.connect_activate(clone!(
+                    #[weak]
+                    gui,
+                    move |_, _| {
+                        if let Err(e) = gui.go_previous() {
+                            eprintln!("{}", e);
+                        }
                     }
-                }));
+                ));
             }
             "go_next" => {
-                action.connect_activate(clone!(@weak gui => move |_,_| {
-                    if let Err(e) = gui.go_next() {
-                        eprintln!("{}", e);
+                action.connect_activate(clone!(
+                    #[weak]
+                    gui,
+                    move |_, _| {
+                        if let Err(e) = gui.go_next() {
+                            eprintln!("{}", e);
+                        }
                     }
-                }));
+                ));
             }
             "new_window" => {
-                action.connect_activate(clone!(@weak gui, @strong app => move |_,_| {
-                    let new_gui = crate::gui::build_ui(&app);
-                    new_gui.new_tab(None);
-                }));
+                action.connect_activate(clone!(
+                    #[weak]
+                    gui,
+                    #[strong]
+                    app,
+                    move |_, _| {
+                        let new_gui = crate::gui::build_ui(&app);
+                        new_gui.new_tab(None);
+                    }
+                ));
             }
             "open_bookmarks" => {
-                action.connect_activate(clone!(@weak gui => move |_,_| {
-                    gui.open_bookmarks();
-                }));
+                action.connect_activate(clone!(
+                    #[weak]
+                    gui,
+                    move |_, _| {
+                        gui.open_bookmarks();
+                    }
+                ));
             }
             "bookmark_page" => {
-                action.connect_activate(clone!(@weak gui => move |_,_| {
-                    if let Some(tab) = gui.current_tab() {
-                        tab.bookmark_editor.popup();
+                action.connect_activate(clone!(
+                    #[weak]
+                    gui,
+                    move |_, _| {
+                        if let Some(tab) = gui.current_tab() {
+                            tab.bookmark_editor.popup();
+                        }
                     }
-                }));
+                ));
             }
             "open_history" => {
-                action.connect_activate(clone!(@weak gui => move |_,_| {
-                    println!("Not implemented yet");
-                }));
+                action.connect_activate(clone!(
+                    #[weak]
+                    gui,
+                    move |_, _| {
+                        println!("Not implemented yet");
+                    }
+                ));
             }
             "clear_history" => {
-                action.connect_activate(clone!(@weak gui => move |_,_| {
-                    println!("Not implemented yet");
-                }));
+                action.connect_activate(clone!(
+                    #[weak]
+                    gui,
+                    move |_, _| {
+                        println!("Not implemented yet");
+                    }
+                ));
             }
             "view_source" => {
-                action.connect_activate(clone!(@weak gui => move |_,_| {
-                    if let Some(tab) = gui.current_tab() {
-                        tab.view_source();
+                action.connect_activate(clone!(
+                    #[weak]
+                    gui,
+                    move |_, _| {
+                        if let Some(tab) = gui.current_tab() {
+                            tab.view_source();
+                        }
                     }
-                }));
+                ));
             }
             "save_page" => {
-                action.connect_activate(clone!(@weak gui => move |_,_| {
-                    gui.save_page();
-                }));
+                action.connect_activate(clone!(
+                    #[weak]
+                    gui,
+                    move |_, _| {
+                        gui.save_page();
+                    }
+                ));
             }
             "open_prefs" => {
-                action.connect_activate(clone!(@weak gui => move |_,_| {
-                    gui.dialogs.preferences.show();
-                }));
+                action.connect_activate(clone!(
+                    #[weak]
+                    gui,
+                    move |_, _| {
+                        gui.dialogs.preferences.show();
+                    }
+                ));
             }
             "open_about" => {
-                action.connect_activate(clone!(@weak gui => move |_,_| {
-                    gui.dialogs.about.show();
-                }));
+                action.connect_activate(clone!(
+                    #[weak]
+                    gui,
+                    move |_, _| {
+                        gui.dialogs.about.show();
+                    }
+                ));
             }
             "quit" => {
-                action.connect_activate(clone!(@weak gui => move |_,_| {
-                    gui.window.close();
-                }));
+                action.connect_activate(clone!(
+                    #[weak]
+                    gui,
+                    move |_, _| {
+                        gui.window.close();
+                    }
+                ));
             }
             _ => {}
         }

@@ -1,19 +1,20 @@
 use {
     std::{env, fs, path::PathBuf},
     tiny_skia::Transform,
-    usvg::{FitTo, Options, Tree},
+    usvg::{Options, Tree},
 };
 
 use std::error::Error;
 
 fn png(tree: &Tree, size: u32) -> Result<(), Box<dyn Error>> {
-    let fit = FitTo::Size(size, size);
-    let transform = Transform::from_scale(1.0, 1.0);
+    let svg_size = tree.size();
+    let scale = (size as f32 / svg_size.width()).min(size as f32 / svg_size.height());
+    let transform = Transform::from_scale(scale, scale);
     let mut pixmap = match tiny_skia::Pixmap::new(size, size) {
         Some(p) => p,
         None => return Err(String::from("Error creating png").into()),
     };
-    resvg::render(&tree, fit, transform, pixmap.as_mut());
+    resvg::render(tree, transform, &mut pixmap.as_mut());
     let sizedir = format!("{}x{}", size, size);
     let outdir: PathBuf = [
         "target", "dist", "share", "icons", "hicolor", &sizedir, "apps",
@@ -35,7 +36,7 @@ fn iconvert() -> Result<(), Box<dyn Error>> {
     println!("Creating png icons from svg:");
     let infile: PathBuf = ["data", "eva.svg"].iter().collect();
     let data = fs::read(&infile)?;
-    let tree = Tree::from_data(&data, &Options::default().to_ref())?;
+    let tree = Tree::from_data(&data, &Options::default())?;
     for size in [128, 64, 48, 32] {
         png(&tree, size)?;
     }
@@ -50,7 +51,9 @@ fn copy_data() -> Result<(), Box<dyn Error>> {
     }
     let mut outfile = appdir;
     outfile.push("org.hitchhiker-linux.eva.desktop");
-    let infile: PathBuf = ["data", "org.hitchhiker-linux.eva.desktop"].iter().collect();
+    let infile: PathBuf = ["data", "org.hitchhiker-linux.eva.desktop"]
+        .iter()
+        .collect();
     fs::copy(&infile, &outfile)?;
     println!("    {} -> {}", infile.display(), outfile.display());
     let icondir: PathBuf = [
@@ -89,7 +92,6 @@ fn copy_bin() -> Result<(), Box<dyn Error>> {
 fn usage() {
     println!("Usage: xtask dist");
 }
-
 
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = env::args().collect();

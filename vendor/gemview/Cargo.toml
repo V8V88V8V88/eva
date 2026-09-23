@@ -1,0 +1,29 @@
+[package]
+name = "gemview"
+version = "0.6.0"
+edition = "2021"
+rust-version = "1.92"
+description = "A Gemini protocol browser in a Gtk+ (v4) widget"
+authors = ["Nathan Fisher"]
+repository = "https://codeberg.org/jeang3nie/gemview"
+keywords = ["gemini", "networking", "gtk", "browser"]
+categories = ["gui", "network-programming"]
+license = "LGPL-3.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+mime_open = "0.2"
+textwrap = "0.16"
+tree_magic_mini = "3.2"
+url = "2.5"
+urlencoding = "2.1"
+
+[dependencies.bucky]
+path = "../bucky"
+features = [ "data", "file", "finger", "gemini", "gopher", "spartan" ]
+
+[dependencies.gtk]
+version = "0.11"
+package = "gtk4"
+features = ["v4_22"]

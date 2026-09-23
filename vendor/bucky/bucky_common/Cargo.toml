@@ -1,0 +1,13 @@
+[package]
+edition = "2021"
+rust-version.workspace = true
+name = "bucky-common"
+version = "0.1.0"
+description = "A Smolweb client library"
+authors = ["Nathan Fisher"]
+repository = "https://codeberg.org/jeang3nie/bucky"
+keywords = ["gemini"]
+license = "LGPL-3.0"
+
+[dependencies]
+tree_magic_mini = { workspace = true }

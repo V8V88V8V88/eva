@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<interface>
+  <template class="UploadWidget" parent="GtkBox">
+    <property name="halign">center</property>
+    <child>
+      <object class="GtkStackSwitcher">
+        <property name="stack">upload_stack</property>
+        <property name="can-focus">0</property>
+      </object>
+    </child>
+    <child>
+      <object class="GtkStack" id="upload_stack">
+        <property name="transition-type">crossfade</property>
+        <child>
+          <object class="GtkStackPage">
+            <property name="name">edit</property>
+            <property name="title">Edit</property>
+            <property name="child">
+              <object class="GtkBox">
+                <property name="orientation">vertical</property>
+		<child>
+                  <object class="GtkTextView" id="editor">
+                  </object>
+		</child>
+		<child>
+                  <object class="GtkBox">
+                    <property name="Orientation">horizontal</property>
+		    <child>
+                      <object class="GtkButton" id="editor_cancel">
+                        <property name="halign">start</property>
+			<property name="label">Cancel</property>
+		      </object>
+		    </child>
+		    <child>
+                      <object class="GtkButton" id="editor_upload">
+                        <property name="halign">upload</property>
+			<property name="label">Upload</property>
+		      </object>
+		    </child>
+		  </object>
+		</child>
+              </object>
+            </property>
+          </object>
+	</child>
+        <child>
+          <object class="GtkStackPage">
+            <property name="name">file</property>
+            <property name="title">Choose File</property>
+            <property name="child">
+              <object class="GtkBox">
+                <property name="orientation">vertical</property>
+		<child>
+                  <object class="GtkFileChooserWidget" id="file_chooser">
+		    <property name="action">open</property>
+		  </object>
+		</child>
+		<child>
+                  <object class="GtkBox">
+                    <property name="Orientation">horizontal</property>
+		    <child>
+                      <object class="GtkButton" id="file_choose_cancel">
+                        <property name="halign">start</property>
+			<property name="label">Cancel</property>
+		      </object>
+		    </child>
+		    <child>
+                      <object class="GtkButton" id="file_chooser_upload">
+                        <property name="halign">upload</property>
+			<property name="label">Upload</property>
+		      </object>
+		    </child>
+		  </object>
+		</child>
+              </object>
+            </property>
+          </object>
+	</child>
+      </object>
+    </child>
+  </template>
+</interface>
+

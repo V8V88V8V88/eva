@@ -15,7 +15,8 @@ use {
 glib::wrapper! {
     pub struct BookmarkEditor(ObjectSubclass<imp::BookmarkEditor>)
         @extends gtk::Popover, gtk::Widget,
-        @implements gtk::Buildable;
+        @implements gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget,
+            gtk::Native, gtk::ShortcutManager;
 }
 
 impl Default for BookmarkEditor {
@@ -26,7 +27,7 @@ impl Default for BookmarkEditor {
 
 impl BookmarkEditor {
     pub fn new() -> Self {
-        let editor: Self = Object::new(&[]);
+        let editor: Self = Object::new();
         let ed = editor.clone();
         editor.imp().cancel.connect_clicked(move |_| ed.popdown());
         let ed = editor.clone();

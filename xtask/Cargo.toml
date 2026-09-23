@@ -3,8 +3,9 @@ name = "xtask"
 version = "0.1.0"
 authors = ["Nathan Fisher <jeang3nie@hitchhiker-linux.org>"]
 edition = "2021"
+rust-version = "1.85"
 
 [dependencies]
-resvg = "0.22"
-usvg = "0.22"
-tiny-skia = "0.6"
+resvg = "0.48"
+usvg = "0.48"
+tiny-skia = "0.12"
