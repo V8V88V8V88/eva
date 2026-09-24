@@ -1,6 +1,30 @@
 #![warn(clippy::all, clippy::pedantic)]
 
-use std::{io, path::PathBuf, string::FromUtf8Error};
+use std::{
+    io,
+    net::{TcpStream, ToSocketAddrs},
+    path::PathBuf,
+    string::FromUtf8Error,
+    time::Duration,
+};
+
+/// Resolve `addr` and try each resulting socket address in turn, returning
+/// the first successful connection. Hosts commonly publish both AAAA and A
+/// records while only listening on one address family, so giving up after the
+/// first address fails would make such hosts unreachable.
+/// # Errors
+/// Returns the error from the last address tried, or an error if the host
+/// did not resolve to any address.
+pub fn connect<A: ToSocketAddrs>(addr: A, timeout: Duration) -> io::Result<TcpStream> {
+    let mut last_err = None;
+    for sock_addr in addr.to_socket_addrs()? {
+        match TcpStream::connect_timeout(&sock_addr, timeout) {
+            Ok(stream) => return Ok(stream),
+            Err(e) => last_err = Some(e),
+        }
+    }
+    Err(last_err.unwrap_or_else(|| io::Error::other("No data retrieved")))
+}
 
 #[derive(Clone, Debug)]
 pub struct Content {

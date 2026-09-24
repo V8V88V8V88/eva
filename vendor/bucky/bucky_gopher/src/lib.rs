@@ -7,8 +7,7 @@ use {
     parser::LineType,
     std::{
         error::Error,
-        io::{self, Read, Write},
-        net::{TcpStream, ToSocketAddrs},
+        io::{Read, Write},
         time::Duration,
     },
     url::Url,
@@ -76,12 +75,7 @@ pub fn request(url: &Url) -> Result<Content, Box<dyn Error>> {
         Some(h) => format!("{h}:{}", url.port().unwrap_or(70)),
         None => return Err(RequestError::DnsError.into()),
     };
-    let mut it = host_str.to_socket_addrs()?;
-    let Some(socket_addrs) = it.next() else {
-        let err = io::Error::new(io::ErrorKind::Other, "No data retrieved");
-        return Err(err.into());
-    };
-    match TcpStream::connect_timeout(&socket_addrs, Duration::new(10, 0)) {
+    match common::connect(host_str.as_str(), Duration::new(10, 0)) {
         Err(e) => Err(e.into()),
         Ok(mut stream) => {
             let path = url.path().to_string();

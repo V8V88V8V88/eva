@@ -9,7 +9,6 @@ use native_tls::TlsConnector;
 use url::Url;
 
 use std::convert::TryFrom;
-use std::net::ToSocketAddrs;
 use std::time::Duration;
 
 /// Contains a request to a server
@@ -106,25 +105,12 @@ impl rustls::client::ServerCertVerifier for TofuVerifier {
 
 /// Open a TCP stream to a [`Url`](gmi::url::Url) given with a default port listed.
 fn open_tcp_stream(url: &Url, default_port: u16) -> Result<std::net::TcpStream, RequestError> {
-    let mut addrs_iter = match (match url.host_str() {
-        Some(h) => h.to_string(),
-        None => return Err(RequestError::DnsError),
-    } + ":"
-        + &url.port().unwrap_or(default_port).to_string())
-        .to_socket_addrs()
-    {
-        Ok(it) => it,
-        Err(e) => return Err(RequestError::IoError(e)),
+    let Some(host) = url.host_str() else {
+        return Err(RequestError::DnsError);
     };
-    let Some(socket_addrs) = addrs_iter.next() else {
-        let err = std::io::Error::new(std::io::ErrorKind::Other, "No data retrieved");
-        return Err(RequestError::IoError(err));
-    };
-    let tcp_stream = match std::net::TcpStream::connect_timeout(&socket_addrs, Duration::new(10, 0))
-    {
-        Err(e) => return Err(RequestError::IoError(e)),
-        Ok(s) => s,
-    };
+    let port = url.port().unwrap_or(default_port);
+    let tcp_stream = common::connect(format!("{host}:{port}"), Duration::new(10, 0))
+        .map_err(RequestError::IoError)?;
     Ok(tcp_stream)
 }
 
