@@ -552,7 +552,8 @@ impl GemView {
     fn absolute_url(&self, url: &str) -> Result<Url, Box<dyn std::error::Error>> {
         match Url::parse(url) {
             Ok(u) => match u.scheme() {
-                "gemini" | "mercury" | "data" | "gopher" | "finger" | "file" | "spartan" => Ok(u),
+                "about" | "gemini" | "mercury" | "data" | "gopher" | "finger" | "file"
+                | "spartan" => Ok(u),
                 s => {
                     self.emit_by_name::<()>("request-unsupported-scheme", &[&url.to_string()]);
                     Err(format!("unsupported-scheme: {s}").into())
@@ -585,6 +586,7 @@ impl GemView {
             }
         };
         match url.scheme() {
+            "about" => self.load_about(&url),
             "data" => self.load_data(&url),
             "gemini" => self.load_gemini(url),
             "gopher" => self.load_gopher(url),
@@ -592,6 +594,20 @@ impl GemView {
             "finger" => self.load_finger(url),
             "spartan" => self.load_spartan(url),
             _ => {}
+        }
+    }
+
+    /// Handles `about:` pages internally, so they are never handed to the
+    /// desktop to open
+    fn load_about(&self, url: &Url) {
+        // `about:///blank` is how GIO passes along `about:blank`
+        if url.path().trim_start_matches('/') == "blank" {
+            let url = url.to_string();
+            self.append_history(&url);
+            self.clear();
+            self.emit_by_name::<()>("page-loaded", &[&url]);
+        } else {
+            self.emit_by_name::<()>("page-load-failed", &[&format!("Unknown page: {url}")]);
         }
     }
 
@@ -659,9 +675,18 @@ impl GemView {
                 && !mime.starts_with("image/")
                 && mime != "inode/directory"
             {
-                if let Err(e) = mime_open::open(url.as_ref()) {
-                    eprintln!("{e}");
-                }
+                // Not something we can display; open it in the default
+                // application through the OpenURI portal
+                let window = self.root().and_downcast::<gtk::Window>();
+                gtk::FileLauncher::new(Some(&gtk::gio::File::for_path(&path))).launch(
+                    window.as_ref(),
+                    gtk::gio::Cancellable::NONE,
+                    |res| {
+                        if let Err(e) = res {
+                            eprintln!("{e}");
+                        }
+                    },
+                );
                 self.emit_by_name::<()>("page-loaded", &[&url.to_string()]);
                 return;
             }

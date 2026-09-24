@@ -16,7 +16,6 @@ categories = ["gui"]
 [dependencies]
 gemview = { path = "vendor/gemview" }
 mime2ext = "0.1"
-mime_open = "0.2"
 fastrand = "2.5"
 toml = "1.1"
 url = "2.5"

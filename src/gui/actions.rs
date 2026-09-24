@@ -9,9 +9,10 @@ use {
     std::rc::Rc,
 };
 
-const ACTIONS: [&str; 28] = [
+const ACTIONS: [&str; 29] = [
     "new_tab",
     "tab_overview",
+    "focus_address",
     "close_tab",
     "next_tab",
     "prev_tab",
@@ -52,7 +53,16 @@ pub fn add(gui: &Rc<Gui>, app: &gtk::Application) {
                     #[strong]
                     gui,
                     move |_, _| {
-                        gui.new_tab(None);
+                        gui.open_new_tab();
+                    }
+                ));
+            }
+            "focus_address" => {
+                action.connect_activate(clone!(
+                    #[weak]
+                    gui,
+                    move |_, _| {
+                        gui.focus_address_bar();
                     }
                 ));
             }

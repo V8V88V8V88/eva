@@ -37,6 +37,7 @@ thread_local! {
 pub struct Gui {
     window: gtk::ApplicationWindow,
     overview: adw::TabOverview,
+    controls_stack: gtk::Stack,
     tab_box: gtk::Box,
     tab_bar: adw::TabBar,
     tab_view: adw::TabView,
@@ -48,6 +49,7 @@ impl Default for Gui {
         let builder = gtk::Builder::from_string(include_str!("main.ui"));
         let window: gtk::ApplicationWindow = builder.object("mainWindow").unwrap();
         let overview: adw::TabOverview = builder.object("tabOverview").unwrap();
+        let controls_stack: gtk::Stack = builder.object("controlsStack").unwrap();
         let tab_box: gtk::Box = builder.object("tabBox").unwrap();
         let tab_bar: adw::TabBar = builder.object("tabBar").unwrap();
         let tab_view: adw::TabView = builder.object("tabView").unwrap();
@@ -56,6 +58,7 @@ impl Default for Gui {
         Self {
             window,
             overview,
+            controls_stack,
             tab_box,
             tab_bar,
             tab_view,
@@ -89,7 +92,10 @@ impl Gui {
         };
         if let Some(uri) = uri {
             if let Ok(u) = Url::parse(uri) {
-                let host = u.host_str().unwrap_or("Unknown host");
+                let host = u.host_str().unwrap_or(match u.scheme() {
+                    "about" => "New Tab",
+                    _ => "Unknown host",
+                });
                 newtab.set_label(host, false);
             }
             newtab.controls.set_uri(uri);
@@ -113,19 +119,16 @@ impl Gui {
             move |_, uri| {
                 tab.controls.set_uri(&uri);
                 tab.controls.set_reload_button_sensitive(true);
-                tab.controls
-                    .set_back_button_sensitive(tab.viewer.has_previous());
-                tab.controls
-                    .set_forward_button_sensitive(tab.viewer.has_next());
+                if let Some(gui) = Self::for_widget(&tab.viewer) {
+                    gui.update_nav_buttons();
+                }
                 tab.update_bookmark_editor();
                 if let Ok(url) = Url::parse(uri.as_str()) {
                     let scheme = url.scheme();
-                    let host = url.host_str().unwrap_or_else(|| {
-                        if scheme == "file" {
-                            "filesystem"
-                        } else {
-                            "Unknown host"
-                        }
+                    let host = url.host_str().unwrap_or(match scheme {
+                        "file" => "filesystem",
+                        "about" => "New Tab",
+                        _ => "Unknown host",
                     });
                     tab.set_window_title(host);
                     tab.set_label(host, false);
@@ -137,10 +140,9 @@ impl Gui {
             newtab,
             move |_, err| {
                 tab.controls.set_reload_button_sensitive(true);
-                tab.controls
-                    .set_back_button_sensitive(tab.viewer.has_previous());
-                tab.controls
-                    .set_forward_button_sensitive(tab.viewer.has_next());
+                if let Some(gui) = Self::for_widget(&tab.viewer) {
+                    gui.update_nav_buttons();
+                }
                 if err.contains("unsupported-scheme") {
                     if let Ok(url) = Url::parse(tab.viewer.uri().as_str()) {
                         if let Some(host) = url.host_str() {
@@ -328,6 +330,26 @@ impl Gui {
         }
     }
 
+    /// Opens a new tab in response to the user asking for one, switches to
+    /// it and focuses its address bar
+    fn open_new_tab(&self) {
+        let page = self.new_tab(None);
+        self.tab_view.set_selected_page(&page);
+        if let Some(tab) = Tab::for_page(&page) {
+            tab.controls.addr_bar().grab_focus();
+        }
+    }
+
+    /// Moves focus to the address bar of the selected tab and selects the
+    /// whole address, so typing replaces it
+    fn focus_address_bar(&self) {
+        if let Some(tab) = self.current_tab() {
+            let entry = tab.controls.addr_bar();
+            entry.grab_focus();
+            entry.select_region(0, -1);
+        }
+    }
+
     fn open_tab_overview(&self) {
         self.overview.set_open(true);
     }
@@ -369,11 +391,38 @@ impl Gui {
         }
     }
 
+    /// Enables the back and forward buttons in the header bar according to
+    /// the history of the selected tab
+    fn update_nav_buttons(&self) {
+        let tab = self.current_tab();
+        for (name, enabled) in [
+            (
+                "go_previous",
+                tab.as_ref().is_some_and(|t| t.viewer.has_previous()),
+            ),
+            ("go_next", tab.as_ref().is_some_and(|t| t.viewer.has_next())),
+        ] {
+            if let Some(action) = self
+                .window
+                .lookup_action(name)
+                .and_downcast::<gtk::gio::SimpleAction>()
+            {
+                action.set_enabled(enabled);
+            }
+        }
+    }
+
     fn switch_tab(&self) {
+        self.update_nav_buttons();
         if let Some(tab) = self.current_tab() {
+            self.controls_stack.set_visible_child(&tab.controls);
             let uri = tab.viewer.uri();
             if let Ok(url) = Url::parse(uri.as_str()) {
-                tab.set_window_title(url.host_str().unwrap_or("Unknown host"));
+                tab.set_window_title(url.host_str().unwrap_or(match url.scheme() {
+                    "file" => "filesystem",
+                    "about" => "New Tab",
+                    _ => "Unknown host",
+                }));
             }
         }
     }
@@ -547,6 +596,13 @@ pub fn run() {
     application.run();
 }
 
+/// Removes `widget` from the `GtkStack` it is in, if any
+fn remove_from_stack(widget: &impl IsA<gtk::Widget>) {
+    if let Some(stack) = widget.parent().and_downcast::<gtk::Stack>() {
+        stack.remove(widget);
+    }
+}
+
 pub fn build_ui(app: &Application) -> Rc<Gui> {
     let gui = Rc::new(Gui::default());
     actions::add(&gui, app);
@@ -557,7 +613,23 @@ pub fn build_ui(app: &Application) -> Rc<Gui> {
         guis.retain(|gui| gui.strong_count() > 0);
         guis.push(Rc::downgrade(&gui));
     });
+    // Each tab's navigation controls live in this window's header bar, so
+    // they have to follow the tab when it is added, dragged in from another
+    // window, or closed
+    gui.tab_view.connect_page_attached(clone!(
+        #[weak]
+        gui,
+        move |_, page, _| {
+            if let Some(tab) = Tab::for_page(page) {
+                remove_from_stack(&tab.controls);
+                gui.controls_stack.add_child(&tab.controls);
+            }
+        }
+    ));
     gui.tab_view.connect_close_page(|_, page| {
+        if let Some(tab) = Tab::for_page(page) {
+            remove_from_stack(&tab.controls);
+        }
         Tab::unregister(&page.child().widget_name());
         glib::Propagation::Proceed
     });

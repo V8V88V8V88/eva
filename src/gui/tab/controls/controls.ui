@@ -3,67 +3,20 @@
   <template class="Controls" parent="GtkBox">
     <property name="orientation">horizontal</property>
     <property name="spacing">6</property>
-    <property name="margin-start">6</property>
-    <property name="margin-end">6</property>
     <child>
-      <object class="GtkBox">
-        <property name="orientation">horizontal</property>
-        <property name="homogeneous">1</property>
-        <property name="css-classes">linked</property>
-        <property name="margin-end">15</property>
-        <child>
-          <object class="GtkButton" id="back_button">
-            <property name="tooltip-text">Go back</property>
-            <property name="sensitive">0</property>
-            <property name="action-name">win.go_previous</property>
-            <child>
-              <object class="GtkImage">
-                <property name="icon-name">go-previous-symbolic</property>
-              </object>
-            </child>
-          </object>
-        </child>
-        <child>
-          <object class="GtkButton" id="forward_button">
-            <property name="tooltip-text">Go Forward</property>
-            <property name="sensitive">0</property>
-            <property name="action-name">win.go_next</property>
-            <child>
-              <object class="GtkImage">
-                <property name="icon-name">go-next-symbolic</property>
-              </object>
-            </child>
-          </object>
-        </child>
-        <child>
-          <object class="GtkButton" id="reload_button">
-            <property name="tooltip-text">Reload page</property>
-            <property name="sensitive">0</property>
-            <property name="action-name">win.reload</property>
-            <child>
-              <object class="GtkImage">
-                <property name="icon-name">view-refresh-symbolic</property>
-              </object>
-            </child>
-          </object>
-        </child>
-      </object>
-    </child>
-    <child>
-      <object class="GtkSearchEntry" id="addr_bar">
-        <property name="placeholder_text">Search or enter an address</property>
+      <object class="GtkEntry" id="addr_bar">
+        <property name="placeholder-text">Search or enter an address</property>
         <property name="hexpand">1</property>
-      </object>
-    </child>
-    <child>
-      <object class="GtkMenuButton" id="input_button">
-        <property name="has-frame">0</property>
-        <property name="visible">0</property>
+        <property name="xalign">0.5</property>
+        <property name="secondary-icon-name">view-refresh-symbolic</property>
+        <property name="secondary-icon-tooltip-text">Reload page</property>
+        <property name="secondary-icon-sensitive">0</property>
       </object>
     </child>
     <child>
       <object class="GtkMenuButton" id="bookmark_button">
         <property name="icon-name">bookmark-new-symbolic</property>
+        <property name="has-frame">0</property>
         <property name="tooltip-text">Bookmark current page</property>
       </object>
     </child>

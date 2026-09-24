@@ -13,7 +13,7 @@ pub struct Search {
 impl Default for Search {
     fn default() -> Self {
         Self {
-            default: String::from("gemini://geminispace.info/search"),
+            default: String::from("gemini://kennedy.gemi.dev/search"),
             all: HashMap::from([
                 (
                     String::from("gmp"),
@@ -26,6 +26,10 @@ impl Default for Search {
                 (
                     String::from("ken"),
                     String::from("gemini://kennedy.gemi.dev/search"),
+                ),
+                (
+                    String::from("tlgs"),
+                    String::from("gemini://tlgs.one/search"),
                 ),
                 (
                     String::from("ron"),

@@ -7,10 +7,10 @@ use gtk::{
 };
 
 glib::wrapper! {
+    /// A bar shown at the top of a page when a server asks for input
     pub struct Input(ObjectSubclass<imp::Input>)
-        @extends gtk::Popover, gtk::Widget,
-        @implements gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget,
-            gtk::Native, gtk::ShortcutManager;
+        @extends adw::Bin, gtk::Widget,
+        @implements gtk::Accessible, gtk::Buildable, gtk::ConstraintTarget;
 }
 
 impl Default for Input {
@@ -24,20 +24,29 @@ impl Input {
         Object::new()
     }
 
-    pub fn entry(&self) -> gtk::Entry {
-        self.imp().entry.clone()
+    /// Shows the bar with the server's prompt. `on_submit` is called with the
+    /// text entered, replacing the handler of any previous request.
+    pub fn request<F: Fn(&str) + 'static>(&self, meta: &str, visibility: bool, on_submit: F) {
+        let imp = self.imp();
+        if let Some(id) = imp.submit_handler.take() {
+            imp.entry.disconnect(id);
+        }
+        let id = imp.entry.connect_activate(move |entry| {
+            let text = entry.text();
+            if !text.is_empty() {
+                on_submit(&text);
+            }
+        });
+        imp.submit_handler.replace(Some(id));
+        imp.label.set_label(meta);
+        imp.entry.set_visibility(visibility);
+        imp.entry.set_text("");
+        imp.revealer.set_reveal_child(true);
+        imp.entry.grab_focus();
     }
 
-    pub fn set_visibility(&self, visibility: bool) {
-        self.imp().entry.set_visibility(visibility);
-    }
-
-    pub fn show(&self) {
-        self.popup();
-    }
-
-    pub fn request(&self, meta: &str) {
-        self.imp().label.set_label(meta);
-        self.show();
+    /// Hides the bar
+    pub fn dismiss(&self) {
+        self.imp().revealer.set_reveal_child(false);
     }
 }

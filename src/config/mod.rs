@@ -193,7 +193,7 @@ pub enum ShowTabs {
 
 impl Default for ShowTabs {
     fn default() -> Self {
-        Self::Always
+        Self::Multiple
     }
 }
 

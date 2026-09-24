@@ -443,7 +443,6 @@ version = "0.6.0"
 dependencies = [
  "bucky",
  "gtk4",
- "mime_open",
  "textwrap",
  "tree_magic_mini",
  "url",
@@ -884,12 +883,6 @@ checksum = "488016bfae457b036d996092f6cb448677611ce4449e970ceaf42695203f218a"
 dependencies = [
  "autocfg",
 ]
-
-[[package]]
-name = "mime_open"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "026be65003da266efdef430411a645b15bb652f9c890b74433fa887c1f5bef6b"
 
 [[package]]
 name = "minimal-lexical"

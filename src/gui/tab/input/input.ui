@@ -1,21 +1,50 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <interface>
-  <template class="Input" parent="GtkPopover">
-    <property name="autohide">1</property>
-    <property name="has-arrow">0</property>
-    <property name="position">bottom</property>
-    <child>
-      <object class="GtkBox">
-        <property name="orientation">vertical</property>
-        <property name="spacing">3</property>
+  <template class="Input" parent="AdwBin">
+    <property name="child">
+      <object class="GtkRevealer" id="revealer">
+        <property name="transition-type">slide-down</property>
         <child>
-          <object class="GtkLabel" id="label"></object>
-        </child>
-        <child>
-          <object class="GtkEntry" id="entry"></object>
+          <object class="GtkBox">
+            <property name="orientation">horizontal</property>
+            <property name="spacing">12</property>
+            <property name="margin-start">12</property>
+            <property name="margin-end">12</property>
+            <property name="margin-top">6</property>
+            <property name="margin-bottom">6</property>
+            <child>
+              <object class="GtkLabel" id="label">
+                <property name="wrap">1</property>
+                <property name="xalign">0</property>
+                <property name="max-width-chars">40</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkEntry" id="entry">
+                <property name="hexpand">1</property>
+              </object>
+            </child>
+            <child>
+              <object class="GtkButton" id="send">
+                <property name="label">Send</property>
+                <style>
+                  <class name="suggested-action"/>
+                </style>
+              </object>
+            </child>
+            <child>
+              <object class="GtkButton" id="cancel">
+                <property name="icon-name">window-close-symbolic</property>
+                <property name="tooltip-text">Cancel</property>
+                <style>
+                  <class name="flat"/>
+                  <class name="circular"/>
+                </style>
+              </object>
+            </child>
+          </object>
         </child>
       </object>
-    </child>
+    </property>
   </template>
 </interface>
-    

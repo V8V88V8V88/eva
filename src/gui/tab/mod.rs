@@ -48,9 +48,7 @@ impl Default for Tab {
         let input = Input::default();
         let bookmark_editor = BookmarkEditor::default();
         let controls = Controls::default();
-        controls.set_input_popover(Some(&input));
         controls.set_bookmark_popover(Some(&bookmark_editor));
-        tab.append(&controls);
         let upload = gtk::FileChooserDialog::builder()
             .use_header_bar(1)
             .destroy_with_parent(true)
@@ -74,6 +72,7 @@ impl Default for Tab {
         viewer.set_margin_bottom(25);
         viewer.set_css_classes(&["gemview"]);
         scroller.set_child(Some(&viewer));
+        tab.append(&input);
         tab.append(&scroller);
 
         Self {
@@ -93,8 +92,6 @@ impl Tab {
         let tab = Self::default();
         tab.set_fonts();
         tab.update_bookmark_editor();
-        tab.controls.set_back_button_sensitive(false);
-        tab.controls.set_forward_button_sensitive(false);
         tab
     }
 
@@ -118,14 +115,23 @@ impl Tab {
         self.viewer.connect_request_unsupported_scheme(clone!(
             #[strong(rename_to = tab)]
             self,
-            move |_, uri| {
+            move |viewer, uri| {
                 if let Some((scheme, _)) = uri.split_once(':') {
                     match scheme {
                         "eva" => tab.request_eva_page(&uri),
+                        // Hand anything else to the desktop's default handler
+                        // for that scheme, through the OpenURI portal
                         _ => {
-                            if let Err(e) = mime_open::open(&uri) {
-                                eprintln!("Error opening {}: {}", uri, e);
-                            }
+                            let window = viewer.root().and_downcast::<gtk::Window>();
+                            gtk::UriLauncher::new(&uri).launch(
+                                window.as_ref(),
+                                gtk::gio::Cancellable::NONE,
+                                move |res| {
+                                    if let Err(e) = res {
+                                        eprintln!("Error opening {uri}: {e}");
+                                    }
+                                },
+                            );
                         }
                     }
                 }
@@ -164,20 +170,14 @@ impl Tab {
 
     pub fn request_input(&self, meta: &str, url: String, visibility: bool) {
         let viewer = self.viewer.clone();
-        let popover = self.input.clone();
-        self.input.set_visibility(visibility);
-        self.input.entry().connect_activate(move |entry| {
-            let response = entry.text();
-            if response.as_str() != "" {
-                let mut url = url.to_string();
-                url.push('?');
-                let response = urlencoding::encode(response.as_str());
-                url.push_str(&response);
-                viewer.visit(&url);
-                popover.popdown();
-            }
+        let input = self.input.clone();
+        self.input.request(meta, visibility, move |response| {
+            let mut url = url.clone();
+            url.push('?');
+            url.push_str(&urlencoding::encode(response));
+            viewer.visit(&url);
+            input.dismiss();
         });
-        self.input.request(meta);
     }
 
     pub fn tab(&self) -> gtk::Box {

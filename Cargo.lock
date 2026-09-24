@@ -299,7 +299,6 @@ dependencies = [
  "gtk4",
  "libadwaita",
  "mime2ext",
- "mime_open",
  "rgba_simple",
  "serde",
  "toml",
@@ -490,7 +489,6 @@ version = "0.6.0"
 dependencies = [
  "bucky",
  "gtk4",
- "mime_open",
  "textwrap",
  "tree_magic_mini",
  "url",
@@ -1002,12 +1000,6 @@ name = "mime2ext"
 version = "0.1.54"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cbf6f36070878c42c5233846cd3de24cf9016828fd47bc22957a687298bb21fc"
-
-[[package]]
-name = "mime_open"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "026be65003da266efdef430411a645b15bb652f9c890b74433fa887c1f5bef6b"
 
 [[package]]
 name = "minimal-lexical"

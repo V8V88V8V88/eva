@@ -1,10 +1,10 @@
 mod imp;
 
 use {
-    super::{BookmarkEditor, Input},
+    super::BookmarkEditor,
     gtk::{
         glib::{self, Object},
-        prelude::{EditableExt, WidgetExt},
+        prelude::{EditableExt, EntryExt},
         subclass::prelude::*,
     },
 };
@@ -26,28 +26,18 @@ impl Controls {
         Object::new()
     }
 
-    pub fn set_back_button_sensitive(&self, sensitive: bool) {
-        self.imp().back_button.set_sensitive(sensitive);
-    }
-
-    pub fn set_forward_button_sensitive(&self, sensitive: bool) {
-        self.imp().forward_button.set_sensitive(sensitive);
-    }
-
     pub fn set_reload_button_sensitive(&self, sensitive: bool) {
-        self.imp().reload_button.set_sensitive(sensitive);
+        self.imp()
+            .addr_bar
+            .set_icon_sensitive(gtk::EntryIconPosition::Secondary, sensitive);
     }
 
-    pub fn addr_bar(&self) -> gtk::SearchEntry {
+    pub fn addr_bar(&self) -> gtk::Entry {
         self.imp().addr_bar.clone()
     }
 
     pub fn set_uri(&self, uri: &str) {
         self.imp().addr_bar.set_text(uri);
-    }
-
-    pub fn set_input_popover(&self, popover: Option<&Input>) {
-        self.imp().input_button.set_popover(popover);
     }
 
     pub fn set_bookmark_icon_name(&self, name: &str) {

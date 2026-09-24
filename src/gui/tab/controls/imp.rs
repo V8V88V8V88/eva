@@ -1,5 +1,6 @@
 use gtk::{
-    glib::{self, subclass::InitializingObject},
+    glib::{self, clone, subclass::InitializingObject},
+    prelude::*,
     subclass::prelude::*,
     CompositeTemplate,
 };
@@ -8,15 +9,7 @@ use gtk::{
 #[template(file = "controls.ui")]
 pub struct Controls {
     #[template_child]
-    pub back_button: TemplateChild<gtk::Button>,
-    #[template_child]
-    pub forward_button: TemplateChild<gtk::Button>,
-    #[template_child]
-    pub reload_button: TemplateChild<gtk::Button>,
-    #[template_child]
-    pub addr_bar: TemplateChild<gtk::SearchEntry>,
-    #[template_child]
-    pub input_button: TemplateChild<gtk::MenuButton>,
+    pub addr_bar: TemplateChild<gtk::Entry>,
     #[template_child]
     pub bookmark_button: TemplateChild<gtk::MenuButton>,
 }
@@ -39,6 +32,27 @@ impl ObjectSubclass for Controls {
 impl ObjectImpl for Controls {
     fn constructed(&self) {
         self.parent_constructed();
+        // The reload button sits inside the end of the address bar
+        self.addr_bar.connect_icon_press(|entry, pos| {
+            if pos == gtk::EntryIconPosition::Secondary {
+                _ = entry.activate_action("win.reload", None);
+            }
+        });
+        // Center the address while it is just being displayed, and align it
+        // to the start while it is being edited
+        let focus = gtk::EventControllerFocus::new();
+        let entry = self.addr_bar.get();
+        focus.connect_enter(clone!(
+            #[weak]
+            entry,
+            move |_| EntryExt::set_alignment(&entry, 0.0)
+        ));
+        focus.connect_leave(clone!(
+            #[weak]
+            entry,
+            move |_| EntryExt::set_alignment(&entry, 0.5)
+        ));
+        self.addr_bar.add_controller(focus);
     }
 }
 

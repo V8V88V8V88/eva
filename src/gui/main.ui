@@ -58,6 +58,57 @@
     <property name="default-height">500</property>
     <property name="icon-name">eva</property>
     <property name="startup-id">eva</property>
+    <property name="titlebar">
+      <object id="headerBar" class="AdwHeaderBar">
+        <child type="start">
+          <object class="GtkButton">
+            <property name="tooltip-text">Go back</property>
+            <property name="action-name">win.go_previous</property>
+            <property name="icon-name">go-previous-symbolic</property>
+          </object>
+        </child>
+        <child type="start">
+          <object class="GtkButton">
+            <property name="tooltip-text">Go forward</property>
+            <property name="action-name">win.go_next</property>
+            <property name="icon-name">go-next-symbolic</property>
+          </object>
+        </child>
+        <child type="start">
+          <object id="newTab" class="GtkButton">
+            <property name="tooltip-text">New tab</property>
+            <property name="action-name">win.new_tab</property>
+            <property name="icon-name">tab-new-symbolic</property>
+          </object>
+        </child>
+        <property name="title-widget">
+          <object class="AdwClamp">
+            <property name="maximum-size">860</property>
+            <property name="tightening-threshold">560</property>
+            <property name="hexpand">1</property>
+            <property name="child">
+              <object id="controlsStack" class="GtkStack">
+                <property name="hhomogeneous">0</property>
+              </object>
+            </property>
+          </object>
+        </property>
+        <child type="end">
+          <object id="menuButton" class="GtkMenuButton">
+            <property name="tooltip-text">Open application menu</property>
+            <property name="menu-model">actionMenu</property>
+            <property name="icon-name">open-menu-symbolic</property>
+          </object>
+        </child>
+        <child type="end">
+          <object id="tabButton" class="AdwTabButton">
+            <property name="tooltip-text">View open tabs</property>
+            <property name="view">tabView</property>
+            <property name="action-name">win.tab_overview</property>
+          </object>
+        </child>
+      </object>
+    </property>
     <child>
       <object id="tabOverview" class="AdwTabOverview">
         <property name="view">tabView</property>
@@ -70,48 +121,6 @@
             <child>
               <object id="tabBar" class="AdwTabBar">
                 <property name="view">tabView</property>
-                <property name="end-action-widget">
-                  <object class="GtkBox">
-                    <property name="orientation">horizontal</property>
-                    <property name="margin-start">3</property>
-                    <property name="margin-end">3</property>
-                    <child>
-                      <object id="newTab" class="GtkButton">
-                        <property name="margin-start">3</property>
-                        <property name="margin-end">3</property>
-                        <property name="tooltip-text">New tab</property>
-                        <property name="action-name">win.new_tab</property>
-                        <child>
-                          <object class="GtkImage">
-                            <property name="icon-name">tab-new-symbolic</property>
-                          </object>
-                        </child>
-                      </object>
-                    </child>
-                    <child>
-                      <object id="tabButton" class="AdwTabButton">
-                        <property name="margin-start">3</property>
-                        <property name="margin-end">3</property>
-                        <property name="tooltip-text">View open tabs</property>
-                        <property name="view">tabView</property>
-                        <property name="action-name">overview.open</property>
-                      </object>
-                    </child>
-                    <child>
-                      <object id="menuButton" class="GtkMenuButton">
-                        <property name="margin-start">3</property>
-                        <property name="margin-end">3</property>
-                        <property name="tooltip-text">Open application menu</property>
-                        <property name="menu-model">actionMenu</property>
-                        <child>
-                          <object class="GtkImage">
-                            <property name="icon-name">open-menu-symbolic</property>
-                          </object>
-                        </child>
-                      </object>
-                    </child>
-                  </object>
-                </property>
               </object>
             </child>
             <child>
