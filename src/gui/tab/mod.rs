@@ -1,8 +1,7 @@
 pub mod bookmark_editor;
 pub mod controls;
 pub mod input;
-pub mod label;
-pub use {bookmark_editor::BookmarkEditor, controls::Controls, input::Input, label::Label};
+pub use {bookmark_editor::BookmarkEditor, controls::Controls, input::Input};
 
 use {
     super::uri,
@@ -10,16 +9,26 @@ use {
     gemview::GemView,
     gtk::{glib::clone, prelude::*},
     std::{
+        cell::{OnceCell, RefCell},
+        collections::HashMap,
         fs::File,
         io::{BufReader, Read},
+        rc::Rc,
     },
     url::Url,
 };
 
+thread_local! {
+    /// Every open tab, across all windows, keyed by the widget name of its
+    /// content box. Tabs can be dragged between windows, so a per-window
+    /// registry would lose track of them.
+    static TABS: RefCell<HashMap<String, Tab>> = RefCell::new(HashMap::new());
+}
+
 #[derive(Clone, Debug)]
 pub struct Tab {
     tab: gtk::Box,
-    pub label: Label,
+    page: Rc<OnceCell<adw::TabPage>>,
     pub bookmark_editor: BookmarkEditor,
     pub upload: gtk::FileChooserDialog,
     input: Input,
@@ -69,7 +78,7 @@ impl Default for Tab {
 
         Self {
             tab,
-            label: Label::default(),
+            page: Rc::new(OnceCell::new()),
             input,
             upload,
             bookmark_editor,
@@ -123,7 +132,10 @@ impl Tab {
             }
         ));
         let upload = self.upload.clone();
-        self.viewer.connect_request_upload(move |_viewer, _url| {
+        self.viewer.connect_request_upload(move |viewer, _url| {
+            if let Some(window) = viewer.root().and_downcast::<gtk::Window>() {
+                upload.set_transient_for(Some(&window));
+            }
             upload.show();
         });
         self.upload.connect_response(clone!(
@@ -172,6 +184,53 @@ impl Tab {
         self.tab.clone()
     }
 
+    pub fn name(&self) -> String {
+        self.tab.widget_name().to_string()
+    }
+
+    /// Adds this tab to the global registry
+    pub fn register(&self) {
+        TABS.with_borrow_mut(|tabs| tabs.insert(self.name(), self.clone()));
+    }
+
+    /// Removes the tab whose content box has the given widget name
+    pub fn unregister(name: &str) {
+        TABS.with_borrow_mut(|tabs| tabs.remove(name));
+    }
+
+    /// Looks up the tab displayed in the given page
+    pub fn for_page(page: &adw::TabPage) -> Option<Self> {
+        let name = page.child().widget_name();
+        TABS.with_borrow(|tabs| tabs.get(name.as_str()).cloned())
+    }
+
+    /// Returns every open tab, across all windows
+    pub fn all() -> Vec<Self> {
+        TABS.with_borrow(|tabs| tabs.values().cloned().collect())
+    }
+
+    /// Associates this tab with the page it is displayed in. Must be called
+    /// once, right after the tab is added to a `TabView`.
+    pub fn set_page(&self, page: &adw::TabPage) {
+        _ = self.page.set(page.clone());
+    }
+
+    /// Sets the title of the window containing this tab, if it is the
+    /// selected tab of that window
+    pub fn set_window_title(&self, suffix: &str) {
+        if !self.page.get().is_some_and(adw::TabPage::is_selected) {
+            return;
+        }
+        if let Some(window) = self.tab.root().and_downcast::<gtk::Window>() {
+            window.set_title(Some(&format!(
+                "{}-{} - {}",
+                env!("CARGO_PKG_NAME"),
+                env!("CARGO_PKG_VERSION"),
+                suffix,
+            )));
+        }
+    }
+
     pub fn set_fonts(&self) {
         let cfg = CONFIG.lock().unwrap().clone();
         self.viewer
@@ -196,7 +255,10 @@ impl Tab {
     }
 
     pub fn set_label(&self, label: &str, spin: bool) {
-        self.label.set(label, spin);
+        if let Some(page) = self.page.get() {
+            page.set_title(label);
+            page.set_loading(spin);
+        }
     }
 
     pub fn request_eva_page(&self, uri: &str) {

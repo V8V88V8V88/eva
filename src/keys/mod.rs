@@ -27,6 +27,7 @@ impl Keys {
         }
         match action {
             "new_tab" => "<primary>T",
+            "tab_overview" => "<primary><Shift>E",
             "close_tab" => "<primary>W",
             "next_tab" => "<primary>Page_Down",
             "prev_tab" => "<primary>Page_Up",

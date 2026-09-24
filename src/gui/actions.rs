@@ -9,8 +9,9 @@ use {
     std::rc::Rc,
 };
 
-const ACTIONS: [&str; 27] = [
+const ACTIONS: [&str; 28] = [
     "new_tab",
+    "tab_overview",
     "close_tab",
     "next_tab",
     "prev_tab",
@@ -55,6 +56,15 @@ pub fn add(gui: &Rc<Gui>, app: &gtk::Application) {
                     }
                 ));
             }
+            "tab_overview" => {
+                action.connect_activate(clone!(
+                    #[weak]
+                    gui,
+                    move |_, _| {
+                        gui.open_tab_overview();
+                    }
+                ));
+            }
             "close_tab" => {
                 action.connect_activate(clone!(
                     #[weak]
@@ -87,7 +97,7 @@ pub fn add(gui: &Rc<Gui>, app: &gtk::Application) {
                     #[weak]
                     gui,
                     move |_, _| {
-                        gui.notebook.set_current_page(Some(0));
+                        gui.select_tab(0);
                     }
                 ));
             }
@@ -96,7 +106,7 @@ pub fn add(gui: &Rc<Gui>, app: &gtk::Application) {
                     #[weak]
                     gui,
                     move |_, _| {
-                        gui.notebook.set_current_page(Some(1));
+                        gui.select_tab(1);
                     }
                 ));
             }
@@ -105,7 +115,7 @@ pub fn add(gui: &Rc<Gui>, app: &gtk::Application) {
                     #[weak]
                     gui,
                     move |_, _| {
-                        gui.notebook.set_current_page(Some(2));
+                        gui.select_tab(2);
                     }
                 ));
             }
@@ -114,7 +124,7 @@ pub fn add(gui: &Rc<Gui>, app: &gtk::Application) {
                     #[weak]
                     gui,
                     move |_, _| {
-                        gui.notebook.set_current_page(Some(3));
+                        gui.select_tab(3);
                     }
                 ));
             }
@@ -123,7 +133,7 @@ pub fn add(gui: &Rc<Gui>, app: &gtk::Application) {
                     #[weak]
                     gui,
                     move |_, _| {
-                        gui.notebook.set_current_page(Some(4));
+                        gui.select_tab(4);
                     }
                 ));
             }
@@ -132,7 +142,7 @@ pub fn add(gui: &Rc<Gui>, app: &gtk::Application) {
                     #[weak]
                     gui,
                     move |_, _| {
-                        gui.notebook.set_current_page(Some(5));
+                        gui.select_tab(5);
                     }
                 ));
             }
@@ -141,7 +151,7 @@ pub fn add(gui: &Rc<Gui>, app: &gtk::Application) {
                     #[weak]
                     gui,
                     move |_, _| {
-                        gui.notebook.set_current_page(Some(6));
+                        gui.select_tab(6);
                     }
                 ));
             }
@@ -150,7 +160,7 @@ pub fn add(gui: &Rc<Gui>, app: &gtk::Application) {
                     #[weak]
                     gui,
                     move |_, _| {
-                        gui.notebook.set_current_page(Some(7));
+                        gui.select_tab(7);
                     }
                 ));
             }
@@ -159,7 +169,7 @@ pub fn add(gui: &Rc<Gui>, app: &gtk::Application) {
                     #[weak]
                     gui,
                     move |_, _| {
-                        gui.notebook.set_current_page(Some(8));
+                        gui.select_tab(8);
                     }
                 ));
             }

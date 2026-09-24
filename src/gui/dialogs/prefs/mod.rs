@@ -130,8 +130,6 @@ impl Prefs {
             match pos.as_str() {
                 "top" => Some(TabPosition::Top),
                 "bottom" => Some(TabPosition::Bottom),
-                "left" => Some(TabPosition::Left),
-                "right" => Some(TabPosition::Right),
                 _ => None,
             }
         } else {
@@ -141,10 +139,9 @@ impl Prefs {
 
     pub fn set_tab_position(&self, pos: &TabPosition) {
         self.imp().tab_position.set_active_id(match pos {
-            TabPosition::Top => Some("top"),
+            // The tab bar cannot be placed at the sides; these are shown as top
+            TabPosition::Top | TabPosition::Left | TabPosition::Right => Some("top"),
             TabPosition::Bottom => Some("bottom"),
-            TabPosition::Left => Some("left"),
-            TabPosition::Right => Some("right"),
         });
     }
 

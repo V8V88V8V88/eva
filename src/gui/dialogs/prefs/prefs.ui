@@ -140,8 +140,6 @@
                         <items>
                           <item translatable="yes" id="top">top</item>
                           <item translatable="yes" id="bottom">bottom</item>
-                          <item translatable="yes" id="left">left</item>
-                          <item translatable="yes" id="right">right</item>
                         </items>
                       </object>
                     </child>

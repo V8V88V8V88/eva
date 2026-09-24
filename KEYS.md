@@ -4,6 +4,7 @@ keybindings.
 | Key | Action |
 | --- | --- |
 | Ctrl/T | New tab |
+| Ctrl/Shift/E | View open tabs |
 | Ctrl/N | New window |
 | Ctrl/W | Close tab |
 | Ctrl/Q | Close window |
@@ -41,6 +42,7 @@ back to it's default for that action.
 | Action name | Description |
 | --- | --- |
 | new_tab | Opens a new tab |
+| tab_overview | Shows a grid of all open tabs |
 | close_tab | Closes the current tab |
 | next_tab | Switches to the tab to the right or below the current tab |
 | prev_tab | Switches to the tab to the left or above the current tab |

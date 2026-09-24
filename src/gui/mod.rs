@@ -16,16 +16,30 @@ use {
         Application, CssProvider, ResponseType,
     },
     mime2ext::mime2ext,
-    std::{borrow::Cow, cell::RefCell, collections::HashMap, fs, path::PathBuf, rc::Rc},
+    std::{
+        borrow::Cow,
+        cell::RefCell,
+        fs,
+        path::PathBuf,
+        rc::{Rc, Weak},
+    },
     tab::Tab,
     url::Url,
 };
 
+thread_local! {
+    /// Every open window. Used to find the window a tab currently belongs to,
+    /// since tabs can be dragged from one window to another.
+    static GUIS: RefCell<Vec<Weak<Gui>>> = const { RefCell::new(Vec::new()) };
+}
+
 #[derive(Clone)]
 pub struct Gui {
     window: gtk::ApplicationWindow,
-    notebook: gtk::Notebook,
-    tabs: RefCell<HashMap<String, Tab>>,
+    overview: adw::TabOverview,
+    tab_box: gtk::Box,
+    tab_bar: adw::TabBar,
+    tab_view: adw::TabView,
     dialogs: Dialogs,
 }
 
@@ -33,25 +47,40 @@ impl Default for Gui {
     fn default() -> Self {
         let builder = gtk::Builder::from_string(include_str!("main.ui"));
         let window: gtk::ApplicationWindow = builder.object("mainWindow").unwrap();
-        let notebook: gtk::Notebook = builder.object("mainNotebook").unwrap();
-        let tabs: RefCell<HashMap<String, Tab>> = RefCell::new(HashMap::new());
+        let overview: adw::TabOverview = builder.object("tabOverview").unwrap();
+        let tab_box: gtk::Box = builder.object("tabBox").unwrap();
+        let tab_bar: adw::TabBar = builder.object("tabBar").unwrap();
+        let tab_view: adw::TabView = builder.object("tabView").unwrap();
         let dialogs: Dialogs = Dialogs::init(&window);
 
         Self {
             window,
-            notebook,
-            tabs,
+            overview,
+            tab_box,
+            tab_bar,
+            tab_view,
             dialogs,
         }
     }
 }
 
 impl Gui {
-    fn new_tab(&self, uri: Option<&str>) {
+    /// Returns the window which currently contains `widget`
+    fn for_widget(widget: &impl IsA<gtk::Widget>) -> Option<Rc<Self>> {
+        let root = widget.root()?;
+        GUIS.with_borrow(|guis| {
+            guis.iter()
+                .filter_map(Weak::upgrade)
+                .find(|gui| gui.window.upcast_ref::<gtk::Root>() == &root)
+        })
+    }
+
+    fn new_tab(&self, uri: Option<&str>) -> adw::TabPage {
         let newtab = tab::Tab::init();
-        self.tabs
-            .borrow_mut()
-            .insert(newtab.tab().widget_name().to_string(), newtab.clone());
+        newtab.register();
+        let page = self.tab_view.append(&newtab.tab());
+        newtab.set_page(&page);
+        newtab.set_label("New Tab", false);
         let cfg = CONFIG.lock().unwrap().clone();
         let uri = if cfg.general.new_page == config::NewPage::Home && uri.is_none() {
             Some(cfg.general.homepage.as_str())
@@ -61,38 +90,18 @@ impl Gui {
         if let Some(uri) = uri {
             if let Ok(u) = Url::parse(uri) {
                 let host = u.host_str().unwrap_or("Unknown host");
-                newtab.label.set(host, false);
+                newtab.set_label(host, false);
             }
             newtab.controls.set_uri(uri);
             newtab.controls.set_reload_button_sensitive(true);
             newtab.viewer.visit(uri);
         }
-        self.notebook
-            .append_page(&newtab.tab(), Some(&newtab.label));
-        self.notebook.set_tab_reorderable(&newtab.tab(), true);
         newtab.connect_signals();
-        newtab.upload.set_transient_for(Some(&self.window));
-        newtab.label.close_button().connect_clicked(clone!(
-            #[strong(rename_to = tab)]
-            newtab,
-            #[weak(rename_to = nb)]
-            self.notebook,
-            move |_| {
-                let _name = tab.tab().widget_name().to_string();
-                nb.detach_tab(&tab.tab());
-            }
-        ));
         newtab.viewer.connect_page_load_started(clone!(
-            #[weak(rename_to = window)]
-            self.window,
             #[strong(rename_to = tab)]
             newtab,
             move |_, uri| {
-                window.set_title(Some(&format!(
-                    "{}-{} - [loading]",
-                    env!("CARGO_PKG_NAME"),
-                    env!("CARGO_PKG_VERSION"),
-                )));
+                tab.set_window_title("[loading]");
                 tab.controls.set_uri(&uri);
                 tab.set_label("[loading]", true);
                 tab.controls.set_reload_button_sensitive(false);
@@ -101,8 +110,6 @@ impl Gui {
         newtab.viewer.connect_page_loaded(clone!(
             #[strong(rename_to = tab)]
             newtab,
-            #[weak(rename_to = window)]
-            self.window,
             move |_, uri| {
                 tab.controls.set_uri(&uri);
                 tab.controls.set_reload_button_sensitive(true);
@@ -120,12 +127,7 @@ impl Gui {
                             "Unknown host"
                         }
                     });
-                    window.set_title(Some(&format!(
-                        "{}-{} - {}",
-                        env!("CARGO_PKG_NAME"),
-                        env!("CARGO_PKG_VERSION"),
-                        host,
-                    )));
+                    tab.set_window_title(host);
                     tab.set_label(host, false);
                 }
             }
@@ -133,8 +135,6 @@ impl Gui {
         newtab.viewer.connect_page_load_failed(clone!(
             #[strong(rename_to = tab)]
             newtab,
-            #[weak(rename_to = window)]
-            self.window,
             move |_, err| {
                 tab.controls.set_reload_button_sensitive(true);
                 tab.controls
@@ -145,12 +145,7 @@ impl Gui {
                     if let Ok(url) = Url::parse(tab.viewer.uri().as_str()) {
                         if let Some(host) = url.host_str() {
                             tab.set_label(host, false);
-                            window.set_title(Some(&format!(
-                                "{}-{} -{}",
-                                env!("CARGO_PKG_NAME"),
-                                env!("CARGO_PKG_VERSION"),
-                                host,
-                            )));
+                            tab.set_window_title(host);
                         }
                     }
                     tab.controls.set_uri(tab.viewer.uri().as_str());
@@ -170,20 +165,14 @@ impl Gui {
                         s => s,
                     },
                 ));
-                window.set_title(Some(&format!(
-                    "{}-{} - page load failed",
-                    env!("CARGO_PKG_NAME"),
-                    env!("CARGO_PKG_VERSION"),
-                )));
+                tab.set_window_title("page load failed");
             }
         ));
-        newtab.viewer.connect_request_new_tab(clone!(
-            #[strong(rename_to = gui)]
-            self,
-            move |_, uri| {
+        newtab.viewer.connect_request_new_tab(|viewer, uri| {
+            if let Some(gui) = Self::for_widget(viewer) {
                 gui.new_tab(Some(&uri));
             }
-        ));
+        });
         if let Some(app) = self.window.application() {
             newtab.viewer.connect_request_new_window(move |_, uri| {
                 let gui = build_ui(&app);
@@ -193,18 +182,11 @@ impl Gui {
         newtab.viewer.connect_request_input(clone!(
             #[strong(rename_to = tab)]
             newtab,
-            #[weak(rename_to = window)]
-            self.window,
             move |_viewer, meta, url| {
                 if let Ok(url) = Url::parse(&url) {
                     if let Some(host) = url.host_str() {
                         tab.set_label(host, false);
-                        window.set_title(Some(&format!(
-                            "{}-{} - {}",
-                            env!("CARGO_PKG_NAME"),
-                            env!("CARGO_PKG_VERSION"),
-                            host,
-                        )));
+                        tab.set_window_title(host);
                     }
                 }
                 tab.controls.set_uri(&url);
@@ -214,31 +196,25 @@ impl Gui {
         newtab.viewer.connect_request_input_sensitive(clone!(
             #[strong(rename_to = tab)]
             newtab,
-            #[weak(rename_to = window)]
-            self.window,
             move |_viewer, meta, url| {
                 if let Ok(url) = Url::parse(&url) {
                     if let Some(host) = url.host_str() {
                         tab.set_label(host, false);
-                        window.set_title(Some(&format!(
-                            "{}-{} - {}",
-                            env!("CARGO_PKG_NAME"),
-                            env!("CARGO_PKG_VERSION"),
-                            host,
-                        )));
+                        tab.set_window_title(host);
                     }
                 }
                 tab.controls.set_uri(&url);
                 tab.request_input(&meta, url, false);
             }
         ));
-        newtab.viewer.connect_request_download(clone!(
-            #[strong(rename_to = gui)]
-            self,
-            move |viewer, mime, filename| {
-                gui.download(viewer, &mime, &filename);
-            }
-        ));
+        newtab
+            .viewer
+            .connect_request_download(|viewer, mime, filename| {
+                if let Some(gui) = Self::for_widget(viewer) {
+                    gui.download(viewer, &mime, &filename);
+                }
+            });
+        page
     }
 
     fn download(&self, viewer: &GemView, mime: &str, filename: &str) {
@@ -317,82 +293,43 @@ impl Gui {
         }
     }
 
-    fn current_page(&self) -> Option<u32> {
-        self.notebook.current_page()
-    }
-
     fn current_tab(&self) -> Option<Tab> {
-        if let Some(t) = self.notebook.nth_page(self.current_page()) {
-            self.tabs
-                .borrow()
-                .get(&t.widget_name().to_string())
-                .cloned()
-        } else {
-            None
-        }
+        self.tab_view
+            .selected_page()
+            .as_ref()
+            .and_then(Tab::for_page)
     }
 
-    fn nth_tab(&self, num: u32) -> Option<Tab> {
-        if let Some(t) = self.notebook.nth_page(Some(num)) {
-            self.tabs
-                .borrow()
-                .get(&t.widget_name().to_string())
-                .cloned()
-        } else {
-            None
+    fn select_tab(&self, num: i32) {
+        if num < self.tab_view.n_pages() {
+            self.tab_view
+                .set_selected_page(&self.tab_view.nth_page(num));
         }
     }
 
     fn next_tab(&self) {
-        if let Some(current) = self.notebook.current_page() {
-            let pages = self.notebook.n_pages();
-            if current == pages - 1 {
-                self.notebook.set_current_page(Some(0));
-            } else {
-                self.notebook.set_current_page(Some(current + 1));
-            }
+        if let Some(page) = self.tab_view.selected_page() {
+            let pos = self.tab_view.page_position(&page);
+            self.select_tab((pos + 1) % self.tab_view.n_pages());
         }
     }
 
     fn prev_tab(&self) {
-        if let Some(current) = self.current_page() {
-            let pages = self.notebook.n_pages();
-            if current == 0 {
-                self.notebook.set_current_page(Some(pages - 1));
-            } else {
-                self.notebook.set_current_page(Some(current - 1));
-            }
+        if let Some(page) = self.tab_view.selected_page() {
+            let pos = self.tab_view.page_position(&page);
+            let pages = self.tab_view.n_pages();
+            self.select_tab((pos + pages - 1) % pages);
         }
     }
 
     fn close_current_tab(&self) {
-        if let Some(page) = self.current_page() {
-            if let Some(tab) = self.current_tab() {
-                let name = tab.tab().widget_name().to_string();
-                self.tabs.borrow_mut().remove(&name);
-            }
-            self.notebook.remove_page(Some(page));
+        if let Some(page) = self.tab_view.selected_page() {
+            self.tab_view.close_page(&page);
         }
     }
 
-    /* fn close_tab_named(&self, name: &str) {
-        match self.tabs.borrow().get(name) {
-            Some(tab) => self.notebook.detach_tab(&tab.tab()),
-            None => {},
-        }
-        self.tabs.borrow_mut().remove(name);
-    } */
-
-    fn cleanup_tabs(&self) {
-        let tabs = self.tabs.borrow_mut().clone();
-        for (name, tab) in tabs {
-            match self.notebook.page_num(&tab.tab()) {
-                Some(_) => {}
-                None => {
-                    let _rem = self.tabs.borrow_mut().remove(&name);
-                }
-            }
-        }
+    fn open_tab_overview(&self) {
+        self.overview.set_open(true);
     }
 
     fn reload_current_tab(&self) -> Result<(), Box<dyn std::error::Error>> {
@@ -432,30 +369,29 @@ impl Gui {
         }
     }
 
-    fn switch_tab(&self, page: u32) {
-        if let Some(tab) = self.nth_tab(page) {
+    fn switch_tab(&self) {
+        if let Some(tab) = self.current_tab() {
             let uri = tab.viewer.uri();
             if let Ok(url) = Url::parse(uri.as_str()) {
-                self.window.set_title(Some(&format!(
-                    "{}-{} - {}",
-                    env!("CARGO_PKG_NAME"),
-                    env!("CARGO_PKG_VERSION"),
-                    url.host_str().unwrap_or("Unknown host"),
-                )));
+                tab.set_window_title(url.host_str().unwrap_or("Unknown host"));
             }
         }
     }
 
     fn set_show_tabs(&self, show: &config::ShowTabs) {
-        self.notebook.set_show_tabs(match show {
-            config::ShowTabs::Always => true,
-            config::ShowTabs::Never => false,
-            config::ShowTabs::Multiple => self.notebook.n_pages() > 1,
-        });
+        self.tab_bar.set_visible(*show != config::ShowTabs::Never);
+        self.tab_bar
+            .set_autohide(*show == config::ShowTabs::Multiple);
     }
 
+    /// `AdwTabBar` can only be laid out horizontally, so the left and right
+    /// positions fall back to the top.
     fn set_tab_position(&self, pos: &config::TabPosition) {
-        self.notebook.set_tab_pos(pos.to_gtk());
+        let sibling = match pos {
+            config::TabPosition::Bottom => Some(self.tab_view.upcast_ref::<gtk::Widget>()),
+            _ => None,
+        };
+        self.tab_box.reorder_child_after(&self.tab_bar, sibling);
     }
 
     fn set_general(&self, gen: &config::General) {
@@ -587,6 +523,12 @@ pub fn run() {
         std::ops::ControlFlow::Continue(())
     });
 
+    application.connect_startup(|_| {
+        if let Err(e) = adw::init() {
+            eprintln!("Failed to initialize libadwaita: {e}");
+        }
+    });
+
     match application.register(Some(&Cancellable::new())) {
         Ok(_) => {}
         Err(e) => eprintln!("{}", e),
@@ -611,45 +553,46 @@ pub fn build_ui(app: &Application) -> Rc<Gui> {
     let config = CONFIG.lock().unwrap().clone();
     gui.set_css(&config.colors);
     gui.window.set_application(Some(app));
-    gui.notebook.connect_page_removed(clone!(
+    GUIS.with_borrow_mut(|guis| {
+        guis.retain(|gui| gui.strong_count() > 0);
+        guis.push(Rc::downgrade(&gui));
+    });
+    gui.tab_view.connect_close_page(|_, page| {
+        Tab::unregister(&page.child().widget_name());
+        glib::Propagation::Proceed
+    });
+    gui.tab_view.connect_page_detached(clone!(
         #[weak]
         gui,
-        #[strong]
-        config,
-        move |nb, _page, _| {
-            gui.cleanup_tabs();
-            let multi = config.general.show_tabs == config::ShowTabs::Multiple;
-            match nb.n_pages() {
-                0 => gui.window.close(),
-                1 => {
-                    if multi {
-                        nb.set_show_tabs(false);
-                    }
-                }
-                _ => {
-                    if multi {
-                        nb.set_show_tabs(true);
-                    }
-                }
+        move |view, _, _| {
+            if view.n_pages() == 0 {
+                gui.window.close();
             }
         }
     ));
-    gui.notebook.connect_page_added(clone!(
+    gui.tab_view.connect_selected_page_notify(clone!(
         #[weak]
         gui,
-        #[strong]
-        config,
-        move |nb, _page, _| {
-            if nb.n_pages() > 1 && config.general.show_tabs == config::ShowTabs::Multiple {
-                nb.set_show_tabs(true);
-            }
+        move |_| {
+            gui.switch_tab();
         }
     ));
-    gui.notebook.connect_switch_page(clone!(
+    gui.overview.connect_create_tab(clone!(
         #[weak]
         gui,
-        move |_, _, page| {
-            gui.switch_tab(page);
+        #[upgrade_or_panic]
+        move |_| gui.new_tab(None)
+    ));
+    gui.window.connect_close_request(clone!(
+        #[weak]
+        gui,
+        #[upgrade_or]
+        glib::Propagation::Proceed,
+        move |_| {
+            for i in 0..gui.tab_view.n_pages() {
+                Tab::unregister(&gui.tab_view.nth_page(i).child().widget_name());
+            }
+            glib::Propagation::Proceed
         }
     ));
     gui.dialogs.preferences.connect_response(clone!(
@@ -664,7 +607,7 @@ pub fn build_ui(app: &Application) -> Rc<Gui> {
                     }
                     gui.set_general(&cfg.general);
                     gui.set_css(&cfg.colors);
-                    for (_, tab) in gui.tabs.borrow().clone() {
+                    for tab in Tab::all() {
                         tab.set_fonts();
                     }
                 } else {

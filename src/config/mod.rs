@@ -211,18 +211,6 @@ impl Default for TabPosition {
     }
 }
 
-impl TabPosition {
-    #[must_use]
-    pub fn to_gtk(&self) -> gtk::PositionType {
-        match self {
-            Self::Top => gtk::PositionType::Top,
-            Self::Bottom => gtk::PositionType::Bottom,
-            Self::Left => gtk::PositionType::Left,
-            Self::Right => gtk::PositionType::Right,
-        }
-    }
-}
-
 #[derive(Clone, Deserialize, Debug, Eq, PartialEq, Serialize)]
 pub enum DownloadScheme {
     Ask,
