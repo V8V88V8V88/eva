@@ -66,6 +66,12 @@ impl Default for Tab {
             .css_classes(vec!["gemview".to_string()])
             .build();
         let viewer = GemView::new();
+        viewer.set_known_hosts(
+            crate::history::get_data_dir()
+                .join("known_hosts")
+                .to_string_lossy()
+                .into_owned(),
+        );
         viewer.set_margin_start(25);
         viewer.set_margin_end(25);
         viewer.set_margin_top(25);

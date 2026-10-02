@@ -24,7 +24,7 @@ urlencoding = "2.1"
 [dependencies.adw]
 version = "0.9"
 package = "libadwaita"
-features = ["v1_3"]
+features = ["v1_5"]
 
 [dependencies.chrono]
 version = "0.4"

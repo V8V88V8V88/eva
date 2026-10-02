@@ -5,6 +5,7 @@ pub mod tab;
 pub mod uri;
 use {
     crate::{config, CONFIG},
+    adw::prelude::{AdwDialogExt, AlertDialogExt, AlertDialogExtManual},
     dialogs::Dialogs,
     gemview::GemView,
     gtk::{
@@ -195,6 +196,32 @@ impl Gui {
                 tab.request_input(&meta, url, true);
             }
         ));
+        newtab
+            .viewer
+            .connect_certificate_changed(|viewer, host, fingerprint, expires, url| {
+                let expiry = chrono::DateTime::from_timestamp(expires, 0)
+                    .map_or_else(|| String::from("unknown"), |d| d.format("%Y-%m-%d").to_string());
+                let dlg = adw::AlertDialog::new(
+                    Some("Certificate Changed"),
+                    Some(&format!(
+                        "The certificate presented by {host} does not match the one \
+                        trusted previously. The server may have renewed it, or the \
+                        connection may be intercepted.\n\nNew fingerprint (SHA-256):\n{fingerprint}\n\nExpires: {expiry}"
+                    )),
+                );
+                dlg.add_responses(&[("cancel", "Cancel"), ("trust", "Trust New Certificate")]);
+                dlg.set_response_appearance("trust", adw::ResponseAppearance::Destructive);
+                dlg.set_default_response(Some("cancel"));
+                dlg.set_close_response("cancel");
+                let v = viewer.clone();
+                dlg.connect_response(Some("trust"), move |_, _| {
+                    match v.trust_certificate(&host, &fingerprint, expires) {
+                        Ok(()) => v.visit(&url),
+                        Err(e) => eprintln!("Error saving certificate for {host}: {e}"),
+                    }
+                });
+                dlg.present(Some(viewer));
+            });
         newtab.viewer.connect_request_input_sensitive(clone!(
             #[strong(rename_to = tab)]
             newtab,
