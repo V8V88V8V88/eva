@@ -32,6 +32,8 @@ use {
     bucky::spartan,
 };
 
+const MAX_REDIRECTS: u8 = 5;
+
 #[derive(Clone, Copy)]
 enum TextSize {
     Paragraph,
@@ -854,6 +856,7 @@ impl GemView {
         self.spawn_request(
             move || {
                 let mut url = u;
+                let mut redirects = 0;
                 loop {
                     let response = match gemini::request::request(&url) {
                         Ok(r) => r,
@@ -861,6 +864,10 @@ impl GemView {
                     };
                     match response.status {
                         gemini::protocol::StatusCode::Redirect(c) => {
+                            redirects += 1;
+                            if redirects > MAX_REDIRECTS {
+                                break Response::Error(String::from("Too many redirects"));
+                            }
                             println!("Redirect code {c} with meta {}", response.meta);
                             url = match Url::try_from(response.meta.as_str()) {
                                 Ok(r) => r,
