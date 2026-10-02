@@ -40,7 +40,7 @@ that when Eva sees an official release it will be a polished user experience.
    - [x] Display text
    - [x] Display images
    - [x] View gemtext source
-   - [ ] Tofu
+   - [x] Tofu
    - [ ] Client certificates
    - [x] Send user input
    - [x] Sensitive user input
