@@ -13,6 +13,8 @@ license = "LGPL-3.0"
 url = { workspace = true }
 native-tls = "0.2"
 rcgen = "0.14"
+sha2 = "0.10"
+x509-parser = "0.18"
 
 [dependencies.common]
 package = "bucky-common"

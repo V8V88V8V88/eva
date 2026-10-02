@@ -28,7 +28,7 @@ use {
     bucky::finger,
     bucky::gemini::{self, parser::GemtextNode},
     bucky::gopher::{self, GopherMap},
-    bucky::prelude::{Content, Input, Response},
+    bucky::prelude::{Content, Input, RequestError, Response},
     bucky::spartan,
 };
 
@@ -846,20 +846,32 @@ impl GemView {
                 Response::Error(estr) => {
                     viewer.emit_by_name::<()>("page-load-failed", &[&estr]);
                 }
-                Response::RequestInput(_) => unreachable!(),
+                Response::RequestInput(_) | Response::CertificateChanged { .. } => unreachable!(),
             },
         );
     }
 
     fn load_gemini(&self, url: Url) {
         let u = url.clone();
+        let known_hosts = PathBuf::from(self.known_hosts());
         self.spawn_request(
             move || {
                 let mut url = u;
                 let mut redirects = 0;
                 loop {
-                    let response = match gemini::request::request(&url) {
+                    let response = match gemini::request::request(&url, &known_hosts) {
                         Ok(r) => r,
+                        Err(RequestError::CertificateChanged {
+                            host,
+                            fingerprint,
+                            expires,
+                        }) => {
+                            break Response::CertificateChanged {
+                                host,
+                                fingerprint,
+                                expires,
+                            }
+                        }
                         Err(error) => break Response::Error(format!("{error:?}")),
                     };
                     match response.status {
@@ -916,11 +928,38 @@ impl GemView {
                     viewer.process_gemini_response_success(&content, &url);
                 }
                 Response::Redirect(_s) => {}
+                Response::CertificateChanged {
+                    host,
+                    fingerprint,
+                    expires,
+                } => {
+                    let estr = format!("The certificate for {host} has changed");
+                    viewer.emit_by_name::<()>("page-load-failed", &[&estr]);
+                    viewer.emit_by_name::<()>(
+                        "certificate-changed",
+                        &[&host, &fingerprint, &expires, &url.to_string()],
+                    );
+                }
                 Response::Error(estr) => {
                     viewer.emit_by_name::<()>("page-load-failed", &[&estr]);
                 }
             },
         );
+    }
+
+    /// # Errors
+    /// Returns an error if the known hosts file cannot be written
+    pub fn trust_certificate(
+        &self,
+        host: &str,
+        fingerprint: &str,
+        expires: i64,
+    ) -> std::io::Result<()> {
+        let cert = gemini::tofu::Certificate {
+            fingerprint: fingerprint.to_string(),
+            expires,
+        };
+        gemini::tofu::KnownHosts::load(&PathBuf::from(self.known_hosts())).trust(host, &cert)
     }
 
     fn spawn_request(
@@ -1144,6 +1183,21 @@ impl GemView {
             let obj = values[0].get::<Self>().unwrap();
             let uri = values[1].get::<String>().unwrap();
             f(&obj, uri);
+            None
+        })
+    }
+
+    pub fn connect_certificate_changed<F: Fn(&Self, String, String, i64, String) + 'static>(
+        &self,
+        f: F,
+    ) -> glib::SignalHandlerId {
+        self.connect_local("certificate-changed", true, move |values| {
+            let obj = values[0].get::<Self>().unwrap();
+            let host = values[1].get::<String>().unwrap();
+            let fingerprint = values[2].get::<String>().unwrap();
+            let expires = values[3].get::<i64>().unwrap();
+            let url = values[4].get::<String>().unwrap();
+            f(&obj, host, fingerprint, expires, url);
             None
         })
     }

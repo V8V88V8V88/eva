@@ -3,12 +3,16 @@
 //! `openssl`.
 //!
 
-use super::protocol;
+use super::{
+    protocol,
+    tofu::{Certificate, KnownHosts, Trust},
+};
 use common::RequestError;
 use native_tls::TlsConnector;
 use url::Url;
 
 use std::convert::TryFrom;
+use std::path::Path;
 use std::time::Duration;
 
 /// Contains a request to a server
@@ -51,58 +55,6 @@ impl core::fmt::Display for Request {
     }
 }
 
-// This is for the TLS for Gemini. This will just simply trust any TLS
-// certs we get for now. We can implement TOFU later on.
-//struct DummyVerifier {}
-
-/*impl DummyVerifier {
-    pub fn new() -> Self {
-        Self {}
-    }
-}*/
-
-/*impl rustls::client::ServerCertVerifier for DummyVerifier {
-    fn verify_server_cert(
-        &self,
-        _end_entity: &rustls::Certificate,
-        _intermediates: &[rustls::Certificate],
-        _server_name: &rustls::ServerName,
-        _scts: &mut dyn Iterator<Item = &[u8]>,
-        _ocsp_response: &[u8],
-        _now: std::time::SystemTime,
-    ) -> Result<rustls::client::ServerCertVerified, rustls::Error> {
-        Ok(rustls::client::ServerCertVerified::assertion())
-    }
-}*/
-
-/*
-struct TofuVerifier {
-    pub certs: std::collections::HashMap<rustls::ServerName, rustls::Certificate>,
-}
-
-impl TofuVerifier {
-    pub fn new() -> Self {
-        Self {
-            certs: std::collections::HashMap::new(),
-        }
-    }
-}
-
-impl rustls::client::ServerCertVerifier for TofuVerifier {
-    fn verify_server_cert(
-        &self,
-        end_entity: &rustls::Certificate,
-        _intermediates: &[rustls::Certificate],
-        server_name: &rustls::ServerName,
-        _scts: &mut dyn Iterator<Item = &[u8]>,
-        _ocsp_response: &[u8],
-        _now: std::time::SystemTime
-    ) -> Result<rustls::client::ServerCertVerified, rustls::Error> {
-        Ok(rustls::client::ServerCertVerified::assertion())
-    }
-}
-*/
-
 /// Open a TCP stream to a [`Url`](gmi::url::Url) given with a default port listed.
 fn open_tcp_stream(url: &Url, default_port: u16) -> Result<std::net::TcpStream, RequestError> {
     let Some(host) = url.host_str() else {
@@ -136,51 +88,38 @@ fn parse_merc_gemini_resp(resp: &[u8]) -> Result<protocol::Response, RequestErro
 }
 
 /// Make a request to a gemini server
-fn make_gemini_request(url: &Url) -> Result<protocol::Response, RequestError> {
-    // These are only needed in this funcion, so we'll put a use here.
-    //use rustls::client::{ClientConfig, ClientConnection};
-    //use std::sync::Arc;
-
-    // Get our request string
+fn make_gemini_request(url: &Url, known_hosts: &Path) -> Result<protocol::Response, RequestError> {
     let request = Request::from(url);
-
-    //let authority = match url.host_str() {
-    //    Some(h) => h.to_string(),
-    //    None => return Err(RequestError::DnsError),
-    //};
     let port = url.port().unwrap_or(1965);
-
-    // Get our DNS name
-    //let dnsname = match authority.as_str().try_into() {
-    //    Ok(s) => s,
-    //    Err(_) => return Err(RequestError::DnsError),
-    //};
-
-    // Set up rustls
-    //let cfg = ClientConfig::builder()
-    //    .with_safe_defaults()
-    //    .with_custom_certificate_verifier(Arc::new(DummyVerifier::new()))
-    //    .with_no_client_auth();
-
-    // Set up our TLS client
-    //let client = ClientConnection::new(Arc::new(cfg), dnsname).unwrap();
-
     let connector = TlsConnector::builder()
         .danger_accept_invalid_hostnames(true)
         .danger_accept_invalid_certs(true)
         .build()
-        .unwrap();
-
-    // Open up a socket
+        .map_err(|e| RequestError::TlsError(format!("{e:?}")))?;
     let tcp_stream = open_tcp_stream(url, port)?;
-    //let mut tls_stream = rustls::StreamOwned::new(client, tcp_stream);
     let host = url.host_str().unwrap_or("");
-    let tls_stream = connector.connect(host, tcp_stream);
-    let mut tls_stream = match tls_stream {
-        Err(e) => return Err(RequestError::TlsError(format!("{e:?}"))),
-        Ok(stream) => stream,
-    };
-
+    let mut tls_stream = connector
+        .connect(host, tcp_stream)
+        .map_err(|e| RequestError::TlsError(format!("{e:?}")))?;
+    let der = tls_stream
+        .peer_certificate()
+        .and_then(|cert| cert.map(|c| c.to_der()).transpose())
+        .map_err(|e| RequestError::TlsError(format!("{e:?}")))?
+        .ok_or_else(|| RequestError::TlsError(String::from("No server certificate")))?;
+    let cert = Certificate::from_der(&der).map_err(RequestError::TlsError)?;
+    let key = format!("{host}:{port}");
+    let mut known = KnownHosts::load(known_hosts);
+    match known.check(&key, &cert) {
+        Trust::Known => {}
+        Trust::New | Trust::Renewed => known.trust(&key, &cert)?,
+        Trust::Changed => {
+            return Err(RequestError::CertificateChanged {
+                host: key,
+                fingerprint: cert.fingerprint,
+                expires: cert.expires,
+            })
+        }
+    }
     use_stream_do_request(request.raw_string.as_str(), &mut tls_stream)?;
     use_stream_get_resp(&mut tls_stream)
 }
@@ -205,15 +144,14 @@ fn make_mercury_request(url: &Url) -> Result<protocol::Response, RequestError> {
 /// # fn main() -> Result<(), common::RequestError> {
 /// use std::convert::TryFrom;
 /// let url = Url::parse("gemini://gemini.circumlunar.space/").unwrap();
-/// let response = request::request(&url)?;
+/// let response = request::request(&url, std::path::Path::new("known_hosts"))?;
 /// assert_eq!(response.status, StatusCode::Success(0));
 /// # Ok(())
 /// # }
 /// ```
-pub fn request(url: &Url) -> Result<protocol::Response, RequestError> {
-    // Get the scheme, and see what type of request we're making
+pub fn request(url: &Url, known_hosts: &Path) -> Result<protocol::Response, RequestError> {
     match url.scheme() {
-        "gemini" => make_gemini_request(url),
+        "gemini" => make_gemini_request(url, known_hosts),
         "mercury" => make_mercury_request(url),
         s => Err(RequestError::UnknownScheme(String::from(s))),
     }
@@ -226,7 +164,7 @@ mod tests {
     #[test]
     fn make_request_invalid_scheme_error() {
         let raw_url = Url::try_from("https://example.com").unwrap();
-        let response = request(&raw_url).unwrap_err();
+        let response = request(&raw_url, Path::new("known_hosts")).unwrap_err();
         match response {
             RequestError::UnknownScheme(s) => {
                 assert_eq!(s, "https");

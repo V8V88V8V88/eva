@@ -56,6 +56,11 @@ pub enum Response {
     Success(Content),
     Redirect(String),
     RequestInput(Input),
+    CertificateChanged {
+        host: String,
+        fingerprint: String,
+        expires: i64,
+    },
     Error(String),
 }
 
@@ -76,6 +81,11 @@ pub enum RequestError {
     ResponseParseError(ResponseParseError),
     /// Occurs if the request path is not valid
     InvalidPath,
+    CertificateChanged {
+        host: String,
+        fingerprint: String,
+        expires: i64,
+    },
 }
 
 impl std::fmt::Display for RequestError {
@@ -98,6 +108,9 @@ impl std::fmt::Display for RequestError {
             }
             Self::InvalidPath => {
                 write!(f, "Invalid Path")
+            }
+            Self::CertificateChanged { host, .. } => {
+                write!(f, "The certificate for {host} has changed")
             }
         }
     }

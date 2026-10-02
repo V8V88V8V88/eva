@@ -32,6 +32,8 @@ pub struct GemView {
     #[property(get, set)]
     pub(crate) font_h3: RefCell<String>,
     #[property(get, set)]
+    pub(crate) known_hosts: RefCell<String>,
+    #[property(get, set)]
     pub(crate) paragraph_tag: RefCell<gtk::TextTag>,
     #[property(get, set)]
     pub(crate) h1_tag: RefCell<gtk::TextTag>,
@@ -69,6 +71,8 @@ impl ObjectImpl for GemView {
         gtk::prelude::TextViewExt::set_editable(&*obj, false);
         obj.set_cursor_visible(false);
         *self.history.borrow_mut() = History::default();
+        let known_hosts = glib::user_data_dir().join("gemview").join("known_hosts");
+        obj.set_known_hosts(known_hosts.to_string_lossy().into_owned());
         let buffer = gtk::prelude::TextViewExt::buffer(&*obj);
         let mut font = FontDescription::new();
         font.set_family("Sans");
@@ -180,6 +184,14 @@ impl ObjectImpl for GemView {
                     .build(),
                 Signal::builder("request-upload")
                     .param_types([glib::Type::STRING])
+                    .build(),
+                Signal::builder("certificate-changed")
+                    .param_types([
+                        glib::Type::STRING,
+                        glib::Type::STRING,
+                        glib::Type::I64,
+                        glib::Type::STRING,
+                    ])
                     .build(),
             ]
         });
