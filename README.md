@@ -9,6 +9,8 @@ Contents
 * [Installing](#installing)
 * [Building](#building)
 ## Introduction
+Eva was created by Nathan Fisher. I picked it up after it stopped being updated, and keep it working with current GTK4 and Rust.
+
 Eva is a [gemini protocol](https://gemini.circumlunar.space/) browser written in
 [Rust](https://rust-lang.org) using the [gtk+](https://gtk-rs.org/) toolkit. Eva
 is focused on delivering a simple yet powerful interface and clear, readable
