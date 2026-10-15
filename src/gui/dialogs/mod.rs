@@ -1,59 +1,54 @@
 #![warn(clippy::all, clippy::pedantic)]
 mod prefs;
 pub use prefs::Prefs;
-use {gtk::prelude::*, std::env};
+use {adw::prelude::AdwDialogExt, gtk::prelude::*, std::env};
 
 #[derive(Clone)]
 pub struct Dialogs {
-    pub about: gtk::AboutDialog,
     pub save: gtk::FileChooserDialog,
     pub preferences: Prefs,
 }
 
 impl Dialogs {
     pub fn init(window: &gtk::ApplicationWindow) -> Self {
-        let preferences = Self::init_preferences(window);
-        let about = Self::init_about(window);
-        about.add_credit_section(
-            "Gtk4-rs written by",
-            &[
-                "Guillaume Gomez",
-                "Sebastian Dröge",
-                "Bilal Elmoussaoui",
-                "Xiang Fan",
-                "and others",
-            ],
-        );
-        about.add_credit_section("Serde written by", &["David Tolnay", "and others"]);
-        about.add_credit_section("Chrono written by", &["Kang Seonghoon", "and others"]);
-        about.add_credit_section("Url written by", &["The Servo project"]);
-        about.add_credit_section("Lazy-static by", &["Marvin Löbel", "and others"]);
-        about.add_credit_section("Fastrand by", &["Taiki Endo", "and others"]);
-        about.add_credit_section("Urlencoding by", &["Kornel", "Bertram Truong"]);
-        about.add_credit_section("Mime2ext by", &["Jan Verbeek", "and others"]);
-        about.add_credit_section("Gemview by", &["Nathan Fisher"]);
-        about.add_credit_section("Mime-open by", &["Nathan Fisher"]);
-        about.add_credit_section("Rgba-simple by", &["Nathan Fisher"]);
         Self {
-            about,
             save: Self::init_save(window),
-            preferences,
+            preferences: Self::init_preferences(window),
         }
     }
 
-    fn init_about(window: &gtk::ApplicationWindow) -> gtk::AboutDialog {
-        gtk::AboutDialog::builder()
-            .program_name("Eva")
-            .authors(vec!["Nathan Fisher".to_string()])
+    /// Shows the About dialog over `window`
+    pub fn show_about(window: &gtk::ApplicationWindow) {
+        let about = adw::AboutDialog::builder()
+            .application_name("Eva")
+            .application_icon("eva")
+            .developer_name("Vaibhav Pratap Singh")
+            .developers(["Vaibhav Pratap Singh", "Nathan Fisher (original author)"])
             .version(env!("CARGO_PKG_VERSION"))
-            .license(include_str!(r"../../../LICENSE.md"))
-            .wrap_license(true)
-            .comments("A browser for the SmolWeb\nBuilt using Rust and Gtk+")
-            .logo_icon_name("eva")
-            .copyright("©2020 by Nathan Fisher (the JeanG3nie)")
-            .website("https://codeberg.org/jeang3nie/eva")
-            .transient_for(window)
-            .build()
+            .comments("A browser for the SmolWeb, built using Rust and GTK")
+            .website(env!("CARGO_PKG_HOMEPAGE"))
+            .issue_url(concat!(env!("CARGO_PKG_REPOSITORY"), "/issues"))
+            .copyright("© 2020 Nathan Fisher\n© 2026 Vaibhav Pratap Singh")
+            .license_type(gtk::License::Gpl30)
+            .debug_info(format!(
+                "Eva {}\nGTK {}.{}.{}\nlibadwaita {}.{}.{}\n",
+                env!("CARGO_PKG_VERSION"),
+                gtk::major_version(),
+                gtk::minor_version(),
+                gtk::micro_version(),
+                adw::major_version(),
+                adw::minor_version(),
+                adw::micro_version(),
+            ))
+            .build();
+        about.add_acknowledgement_section(
+            Some("Built with"),
+            &[
+                "gtk-rs https://gtk-rs.org",
+                "libadwaita-rs https://world.pages.gitlab.gnome.org/Rust/libadwaita-rs/",
+            ],
+        );
+        about.present(Some(window));
     }
 
     fn init_save(window: &gtk::ApplicationWindow) -> gtk::FileChooserDialog {

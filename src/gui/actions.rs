@@ -311,7 +311,7 @@ pub fn add(gui: &Rc<Gui>, app: &gtk::Application) {
                     #[weak]
                     gui,
                     move |_, _| {
-                        gui.dialogs.about.show();
+                        super::Dialogs::show_about(&gui.window);
                     }
                 ));
             }

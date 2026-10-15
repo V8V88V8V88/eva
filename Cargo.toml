@@ -1,9 +1,9 @@
 [package]
 name = "eva"
-authors = ["Nathan Fisher"]
+authors = ["Vaibhav Pratap Singh", "Nathan Fisher"]
 description = "A gemini (and Gopher/Finger) browser in Gtk4"
-homepage = "https://codeberg.org/jeang3nie/eva"
-repository = "https://codeberg.org/jeang3nie/eva"
+homepage = "https://github.com/V8V88V8V88/eva"
+repository = "https://github.com/V8V88V8V88/eva"
 version = "0.4.1"
 edition = "2021"
 rust-version = "1.92"
