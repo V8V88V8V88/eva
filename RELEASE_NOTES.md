@@ -12,6 +12,15 @@ Contents
 * Move tab sub-structures to ui definition files and subclass as Gobjects
 * Make Preferences dialog a subclass of `GtkDialog`
 * Adjust spacing of widget layout to save vertical space and line up edges
+* Migrate to GTK4 0.11 and libadwaita
+* Add tab overview
+* Add browsing history (Ctrl+H or `eva://history`), with a Clear History option
+* `--private` flag disables saving history
+* Gemini - Verify server certificates with TOFU
+* Gemini - Ask before trusting a changed server certificate
+* Gemini - Stop following redirects after five hops
+* Fall back to other resolved addresses when a connection fails
+* Use the libadwaita About dialog
 
 ## 0.4.1 release
 * Fixes a regression caused by the new parser. This was actually due to a

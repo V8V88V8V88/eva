@@ -1,6 +1,6 @@
 #![warn(clippy::all, clippy::pedantic)]
 #![doc = include_str!("../README.md")]
-use std::sync::{LazyLock, Mutex};
+use std::sync::{atomic::AtomicBool, LazyLock, Mutex};
 /// Everything bookmark related
 pub mod bookmarks;
 /// Handles getting the configuration data to and from disk
@@ -20,6 +20,16 @@ static BOOKMARKS: LazyLock<Mutex<bookmarks::Bookmarks>> = LazyLock::new(|| {
         Err(_) => bookmarks::Bookmarks::default(),
     })
 });
+static HISTORY: LazyLock<Mutex<history::History>> = LazyLock::new(|| {
+    Mutex::new(match history::History::from_file() {
+        Ok(h) => h.unwrap_or_default(),
+        Err(e) => {
+            eprintln!("Error loading history: {e}");
+            history::History::default()
+        }
+    })
+});
+static PRIVATE: AtomicBool = AtomicBool::new(false);
 static SEARCH: LazyLock<gui::uri::Search> = LazyLock::new(gui::uri::Search::load);
 
 fn main() {

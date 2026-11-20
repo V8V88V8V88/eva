@@ -27,6 +27,10 @@
         <attribute name="action">win.open_history</attribute>
       </item>
       <item>
+        <attribute name="label">Clear History</attribute>
+        <attribute name="action">win.clear_history</attribute>
+      </item>
+      <item>
         <attribute name="label">View source</attribute>
         <attribute name="action">win.view_source</attribute>
       </item>

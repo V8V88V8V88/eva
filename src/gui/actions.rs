@@ -264,7 +264,7 @@ pub fn add(gui: &Rc<Gui>, app: &gtk::Application) {
                     #[weak]
                     gui,
                     move |_, _| {
-                        println!("Not implemented yet");
+                        gui.open_history();
                     }
                 ));
             }
@@ -273,7 +273,7 @@ pub fn add(gui: &Rc<Gui>, app: &gtk::Application) {
                     #[weak]
                     gui,
                     move |_, _| {
-                        println!("Not implemented yet");
+                        gui.clear_history();
                     }
                 ));
             }

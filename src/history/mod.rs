@@ -20,7 +20,7 @@ pub fn get_history_file() -> PathBuf {
     histfile
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct History {
     items: HashMap<String, chrono::DateTime<Local>>,
 }
@@ -39,10 +39,27 @@ impl History {
     }
 
     #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
+    }
+
+    #[must_use]
     pub fn page(&self) -> String {
-        let mut page: String = String::from("# History\n");
-        for (url, date) in &self.items {
-            let _ = write!(page, "{date}\n=> {url}\n\n");
+        let mut page = String::from("# History\n");
+        if self.items.is_empty() {
+            page.push_str("\nNo pages visited yet.\n");
+            return page;
+        }
+        let mut entries: Vec<_> = self.items.iter().collect();
+        entries.sort_by(|a, b| b.1.cmp(a.1).then_with(|| a.0.cmp(b.0)));
+        let mut day = None;
+        for (url, date) in entries {
+            let d = date.date_naive();
+            if day != Some(d) {
+                let _ = write!(page, "\n## {}\n", d.format("%A, %B %-d, %Y"));
+                day = Some(d);
+            }
+            let _ = writeln!(page, "=> {url} {} {url}", date.format("%H:%M"));
         }
         page
     }

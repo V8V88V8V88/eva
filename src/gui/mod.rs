@@ -4,7 +4,7 @@ mod dialogs;
 pub mod tab;
 pub mod uri;
 use {
-    crate::{config, CONFIG},
+    crate::{config, CONFIG, HISTORY, PRIVATE},
     adw::prelude::{AdwDialogExt, AlertDialogExt, AlertDialogExtManual},
     dialogs::Dialogs,
     gemview::GemView,
@@ -124,6 +124,7 @@ impl Gui {
                     gui.update_nav_buttons();
                 }
                 tab.update_bookmark_editor();
+                tab.record_history(&uri);
                 if let Ok(url) = Url::parse(uri.as_str()) {
                     let scheme = url.scheme();
                     let host = url.host_str().unwrap_or(match scheme {
@@ -140,6 +141,7 @@ impl Gui {
             #[strong(rename_to = tab)]
             newtab,
             move |_, err| {
+                tab.clear_sensitive();
                 tab.controls.set_reload_button_sensitive(true);
                 if let Some(gui) = Self::for_widget(&tab.viewer) {
                     gui.update_nav_buttons();
@@ -509,6 +511,46 @@ impl Gui {
         }
     }
 
+    fn open_history(&self) {
+        if let Some(tab) = self.current_tab() {
+            tab.open_history();
+            self.window.set_title(Some(&format!(
+                "{}-{} - history",
+                env!("CARGO_PKG_NAME"),
+                env!("CARGO_PKG_VERSION"),
+            )));
+        }
+    }
+
+    fn clear_history(&self) {
+        if HISTORY.lock().unwrap().is_empty() {
+            self.send_notification("History is already empty");
+            return;
+        }
+        let dlg = adw::AlertDialog::new(
+            Some("Clear History?"),
+            Some("Every page in your browsing history will be permanently removed."),
+        );
+        dlg.add_responses(&[("cancel", "Cancel"), ("clear", "Clear History")]);
+        dlg.set_response_appearance("clear", adw::ResponseAppearance::Destructive);
+        dlg.set_default_response(Some("cancel"));
+        dlg.set_close_response("cancel");
+        dlg.connect_response(Some("clear"), |_, _| {
+            let mut history = HISTORY.lock().unwrap();
+            history.clear();
+            if let Err(e) = history.save() {
+                eprintln!("Error saving history: {e}");
+            }
+            drop(history);
+            for tab in Tab::all() {
+                if tab.is_showing_history() {
+                    tab.open_history();
+                }
+            }
+        });
+        dlg.present(Some(&self.window));
+    }
+
     fn save_page(&self) {
         if let Some(tab) = self.current_tab() {
             let viewer = tab.viewer;
@@ -568,9 +610,17 @@ impl Gui {
 }
 
 pub fn run() {
+    let private = std::env::args().skip(1).take_while(|a| a != "--").any(|a| {
+        a == "--private" || (a.starts_with('-') && !a.starts_with("--") && a.contains('p'))
+    });
+    PRIVATE.store(private, std::sync::atomic::Ordering::Relaxed);
+    let mut flags = gtk::gio::ApplicationFlags::HANDLES_OPEN;
+    if private {
+        flags |= gtk::gio::ApplicationFlags::NON_UNIQUE;
+    }
     let application = Rc::new(gtk::Application::new(
         Some("org.hitchhiker-linux.eva"),
-        gtk::gio::ApplicationFlags::HANDLES_OPEN,
+        flags,
     ));
 
     application.add_main_option(

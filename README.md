@@ -36,7 +36,7 @@ that when Eva sees an official release it will be a polished user experience.
    - [x] user specified fonts
    - [x] user specified colors
  - [x] back-forward list
- - [ ] history
+ - [x] history
  - [ ] Gemini protocol
    - [x] Render gmi pages
    - [x] Display text

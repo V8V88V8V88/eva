@@ -5,15 +5,16 @@ pub use {bookmark_editor::BookmarkEditor, controls::Controls, input::Input};
 
 use {
     super::uri,
-    crate::{BOOKMARKS, CONFIG},
+    crate::{BOOKMARKS, CONFIG, HISTORY, PRIVATE},
     gemview::GemView,
     gtk::{glib::clone, prelude::*},
     std::{
-        cell::{OnceCell, RefCell},
+        cell::{Cell, OnceCell, RefCell},
         collections::HashMap,
         fs::File,
         io::{BufReader, Read},
         rc::Rc,
+        sync::atomic::Ordering,
     },
     url::Url,
 };
@@ -32,6 +33,7 @@ pub struct Tab {
     pub bookmark_editor: BookmarkEditor,
     pub upload: gtk::FileChooserDialog,
     input: Input,
+    sensitive: Rc<Cell<bool>>,
     pub controls: Controls,
     pub viewer: GemView,
 }
@@ -85,6 +87,7 @@ impl Default for Tab {
             tab,
             page: Rc::new(OnceCell::new()),
             input,
+            sensitive: Rc::new(Cell::new(false)),
             upload,
             bookmark_editor,
             controls,
@@ -177,7 +180,9 @@ impl Tab {
     pub fn request_input(&self, meta: &str, url: String, visibility: bool) {
         let viewer = self.viewer.clone();
         let input = self.input.clone();
+        let sensitive = self.sensitive.clone();
         self.input.request(meta, visibility, move |response| {
+            sensitive.set(!visibility);
             let mut url = url.clone();
             url.push('?');
             url.push_str(&urlencoding::encode(response));
@@ -284,7 +289,7 @@ impl Tab {
                         }
                     }
                 },
-                //Some("history") => {}
+                Some("history") => self.open_history(),
                 Some("source") => {
                     self.view_source();
                 }
@@ -302,6 +307,41 @@ impl Tab {
         self.controls
             .set_bookmark_icon_name("bookmark-new-symbolic");
         self.set_label("bookmarks", false);
+    }
+
+    pub fn record_history(&self, uri: &str) {
+        if self.sensitive.replace(false) || PRIVATE.load(Ordering::Relaxed) {
+            return;
+        }
+        let Ok(url) = Url::parse(uri) else {
+            return;
+        };
+        if matches!(url.scheme(), "about" | "data" | "eva") {
+            return;
+        }
+        let mut history = HISTORY.lock().unwrap();
+        history.append(uri);
+        if let Err(e) = history.save() {
+            eprintln!("Error saving history: {e}");
+        }
+    }
+
+    pub fn clear_sensitive(&self) {
+        self.sensitive.set(false);
+    }
+
+    pub fn is_showing_history(&self) -> bool {
+        self.viewer.uri() == "eva://history"
+    }
+
+    pub fn open_history(&self) {
+        let page = HISTORY.lock().unwrap().page();
+        self.viewer.render_gmi(&page);
+        self.viewer.set_uri("eva://history");
+        self.controls.set_uri("eva://history");
+        self.controls
+            .set_bookmark_icon_name("bookmark-new-symbolic");
+        self.set_label("history", false);
     }
 
     fn open_bookmark_tags(&self) {
