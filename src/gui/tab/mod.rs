@@ -283,7 +283,8 @@ impl Tab {
                         let bookmarks = BOOKMARKS.lock().unwrap();
                         if let Some(page) = bookmarks.tag_to_gmi(&maybe_tag) {
                             self.viewer.render_gmi(&page);
-                            self.viewer.set_uri(uri);
+                            self.viewer.append_history(uri);
+                            self.update_nav_buttons();
                             self.controls.set_uri("uri");
                             self.set_label("bookmarks", false);
                         }
@@ -302,11 +303,18 @@ impl Tab {
         let bookmarks = BOOKMARKS.lock().unwrap();
         let page = bookmarks.to_gmi();
         self.viewer.render_gmi(&page);
-        self.viewer.set_uri("eva://bookmarks");
+        self.viewer.append_history("eva://bookmarks");
+        self.update_nav_buttons();
         self.controls.set_uri("eva://bookmarks");
         self.controls
             .set_bookmark_icon_name("bookmark-new-symbolic");
         self.set_label("bookmarks", false);
+    }
+
+    fn update_nav_buttons(&self) {
+        if let Some(gui) = super::Gui::for_widget(&self.viewer) {
+            gui.update_nav_buttons();
+        }
     }
 
     pub fn record_history(&self, uri: &str) {
@@ -337,7 +345,8 @@ impl Tab {
     pub fn open_history(&self) {
         let page = HISTORY.lock().unwrap().page();
         self.viewer.render_gmi(&page);
-        self.viewer.set_uri("eva://history");
+        self.viewer.append_history("eva://history");
+        self.update_nav_buttons();
         self.controls.set_uri("eva://history");
         self.controls
             .set_bookmark_icon_name("bookmark-new-symbolic");
@@ -348,7 +357,8 @@ impl Tab {
         let bookmarks = BOOKMARKS.lock().unwrap();
         let page = bookmarks.tags_to_gmi();
         self.viewer.render_gmi(&page);
-        self.viewer.set_uri("eva://bookmarks/tags");
+        self.viewer.append_history("eva://bookmarks/tags");
+        self.update_nav_buttons();
         self.controls.set_uri("eva://bookmarks/tags");
         self.controls
             .set_bookmark_icon_name("bookmark-new-symbolic");

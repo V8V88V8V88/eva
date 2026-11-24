@@ -95,9 +95,18 @@ impl Response {
                 };
                 common::Response::Success(content)
             }
-            Status::ClientError => common::Response::Error(String::from("Client Error")),
-            Status::ServerError => common::Response::Error(String::from("Server Error")),
+            Status::ClientError => common::Response::Error(spartan_error("Client error", &self.meta)),
+            Status::ServerError => common::Response::Error(spartan_error("Server error", &self.meta)),
         }
+    }
+}
+
+fn spartan_error(title: &str, meta: &str) -> String {
+    let meta = meta.trim();
+    if meta.is_empty() {
+        title.to_string()
+    } else {
+        format!("{title}\n\n> {meta}")
     }
 }
 

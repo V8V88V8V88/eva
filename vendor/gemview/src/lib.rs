@@ -174,6 +174,11 @@ impl GemView {
         }
     }
 
+    fn fail_load(&self, url: &str, err: String) {
+        self.append_history(url);
+        self.emit_by_name::<()>("page-load-failed", &[&err]);
+    }
+
     /// Manually appends an item into the browser's history. Normally this function
     /// will not need to be called directly.
     pub fn append_history(&self, uri: &str) {
@@ -609,7 +614,7 @@ impl GemView {
             self.clear();
             self.emit_by_name::<()>("page-loaded", &[&url]);
         } else {
-            self.emit_by_name::<()>("page-load-failed", &[&format!("Unknown page: {url}")]);
+            self.fail_load(&url.to_string(), format!("Unknown page: {url}"));
         }
     }
 
@@ -617,8 +622,7 @@ impl GemView {
         let data = match DataUrl::try_from(url.to_string().as_str()) {
             Ok(d) => d,
             Err(e) => {
-                let estr = format!("{e:?}");
-                self.emit_by_name::<()>("page-load-failed", &[&estr]);
+                self.fail_load(&url.to_string(), format!("{e:?}"));
                 return;
             }
         };
@@ -665,8 +669,9 @@ impl GemView {
                 }
                 _ => unreachable!(),
             },
-            MimeType::Unknown => self
-                .emit_by_name::<()>("page-load-failed", &[&"unrecognized data type".to_string()]),
+            MimeType::Unknown => {
+                self.fail_load(&url.to_string(), "unrecognized data type".to_string());
+            }
         }
     }
 
@@ -761,7 +766,7 @@ impl GemView {
                     }
                 }
                 Response::Error(err) => {
-                    viewer.emit_by_name::<()>("page-load-failed", &[&err]);
+                    viewer.fail_load(&url.to_string(), err);
                 }
                 _ => unreachable!(),
             },
@@ -785,7 +790,7 @@ impl GemView {
                     viewer.emit_by_name::<()>("page-loaded", &[&url]);
                 }
                 Response::Error(err) => {
-                    viewer.emit_by_name::<()>("page-load-failed", &[&err]);
+                    viewer.fail_load(&url.to_string(), err);
                 }
                 _ => unreachable!(),
             },
@@ -814,7 +819,7 @@ impl GemView {
                     viewer.process_gemini_response_success(&content, &url);
                 }
                 Response::Error(estr) => {
-                    viewer.emit_by_name::<()>("page-load-failed", &[&estr]);
+                    viewer.fail_load(&url.to_string(), estr);
                 }
                 _ => unreachable!(),
             },
@@ -910,7 +915,7 @@ impl GemView {
                             };
                             break Response::RequestInput(input);
                         }
-                        status => break Response::Error(format!("{status:?}")),
+                        status => break Response::Error(gemini_error(status, &response.meta)),
                     }
                 }
             },
@@ -934,14 +939,14 @@ impl GemView {
                     expires,
                 } => {
                     let estr = format!("The certificate for {host} has changed");
-                    viewer.emit_by_name::<()>("page-load-failed", &[&estr]);
+                    viewer.fail_load(&url.to_string(), estr);
                     viewer.emit_by_name::<()>(
                         "certificate-changed",
                         &[&host, &fingerprint, &expires, &url.to_string()],
                     );
                 }
                 Response::Error(estr) => {
-                    viewer.emit_by_name::<()>("page-load-failed", &[&estr]);
+                    viewer.fail_load(&url.to_string(), estr);
                 }
             },
         );
@@ -1212,5 +1217,33 @@ impl GemView {
             None => 175,
         };
         fill(glib::markup_escape_text(text).as_str(), width)
+    }
+}
+
+fn gemini_error(status: gemini::protocol::StatusCode, meta: &str) -> String {
+    let code = u8::from(status);
+    let title = match code {
+        41 => "Server unavailable",
+        42 => "CGI error",
+        43 => "Proxy error",
+        44 => "Slow down",
+        51 => "Not found",
+        52 => "Gone",
+        53 => "Proxy request refused",
+        59 => "Bad request",
+        61 => "Certificate not authorized",
+        62 => "Certificate not valid",
+        40..=49 => "Temporary failure",
+        50..=59 => "Permanent failure",
+        60..=69 => "Client certificate required",
+        _ => "Unexpected response",
+    };
+    let meta = meta.trim();
+    if code == 44 && !meta.is_empty() {
+        format!("{title} ({code})\n\n> Wait {meta} seconds before trying again.")
+    } else if meta.is_empty() {
+        format!("{title} ({code})")
+    } else {
+        format!("{title} ({code})\n\n> {meta}")
     }
 }

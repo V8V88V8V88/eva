@@ -36,7 +36,9 @@ impl History {
     }
 
     pub fn append(&mut self, uri: String) {
-        self.back.push(self.uri.clone());
+        if self.uri != "about:blank" {
+            self.back.push(self.uri.clone());
+        }
         self.uri = uri;
         self.forward = vec![];
     }

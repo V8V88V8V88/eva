@@ -16,6 +16,8 @@ Contents
 * Add tab overview
 * Add browsing history (Ctrl+H or `eva://history`), with a Clear History option
 * `--private` flag disables saving history
+* Fix back button landing on about:blank and skipping failed or internal pages
+* Show readable Gemini and Spartan error messages, including the server's reason
 * Gemini - Verify server certificates with TOFU
 * Gemini - Ask before trusting a changed server certificate
 * Gemini - Stop following redirects after five hops
