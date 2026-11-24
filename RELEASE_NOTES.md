@@ -21,6 +21,7 @@ Contents
 * Gemini - Verify server certificates with TOFU
 * Gemini - Ask before trusting a changed server certificate
 * Gemini - Stop following redirects after five hops
+* Gemini - Follow relative redirects
 * Fall back to other resolved addresses when a connection fails
 * Use the libadwaita About dialog
 

@@ -886,7 +886,7 @@ impl GemView {
                                 break Response::Error(String::from("Too many redirects"));
                             }
                             println!("Redirect code {c} with meta {}", response.meta);
-                            url = match Url::try_from(response.meta.as_str()) {
+                            url = match url.join(response.meta.trim()) {
                                 Ok(r) => r,
                                 Err(error) => break Response::Error(format!("{error:?}")),
                             };
