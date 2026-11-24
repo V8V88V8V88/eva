@@ -851,7 +851,9 @@ impl GemView {
                 Response::Error(estr) => {
                     viewer.emit_by_name::<()>("page-load-failed", &[&estr]);
                 }
-                Response::RequestInput(_) | Response::CertificateChanged { .. } => unreachable!(),
+                Response::RequestInput(_)
+                | Response::CertificateChanged { .. }
+                | Response::CertificateRequired { .. } => unreachable!(),
             },
         );
     }
@@ -859,12 +861,13 @@ impl GemView {
     fn load_gemini(&self, url: Url) {
         let u = url.clone();
         let known_hosts = PathBuf::from(self.known_hosts());
+        let client_certs = PathBuf::from(self.client_certs());
         self.spawn_request(
             move || {
                 let mut url = u;
                 let mut redirects = 0;
                 loop {
-                    let response = match gemini::request::request(&url, &known_hosts) {
+                    let response = match gemini::request::request(&url, &known_hosts, Some(&client_certs)) {
                         Ok(r) => r,
                         Err(RequestError::CertificateChanged {
                             host,
@@ -877,7 +880,7 @@ impl GemView {
                                 expires,
                             }
                         }
-                        Err(error) => break Response::Error(format!("{error:?}")),
+                        Err(error) => break Response::Error(format!("{error}")),
                     };
                     match response.status {
                         gemini::protocol::StatusCode::Redirect(c) => {
@@ -886,10 +889,20 @@ impl GemView {
                                 break Response::Error(String::from("Too many redirects"));
                             }
                             println!("Redirect code {c} with meta {}", response.meta);
-                            url = match url.join(response.meta.trim()) {
+                            let target = response.meta.trim();
+                            if target.is_empty() {
+                                break Response::Error(String::from(
+                                    "The server sent a redirect without a destination",
+                                ));
+                            }
+                            let next = match url.join(target) {
                                 Ok(r) => r,
-                                Err(error) => break Response::Error(format!("{error:?}")),
+                                Err(error) => break Response::Error(format!("{error}")),
                             };
+                            if next.scheme() != "gemini" {
+                                break Response::Redirect(next.to_string());
+                            }
+                            url = next;
                         }
                         gemini::protocol::StatusCode::Success(_) => {
                             let mime = if response.meta.starts_with("text/gemini") {
@@ -915,6 +928,14 @@ impl GemView {
                             };
                             break Response::RequestInput(input);
                         }
+                        gemini::protocol::StatusCode::ClientCertRequired(_) => {
+                            break Response::CertificateRequired {
+                                host: url.host_str().unwrap_or_default().to_string(),
+                                url: url.to_string(),
+                                meta: response.meta,
+                                code: u8::from(response.status),
+                            };
+                        }
                         status => break Response::Error(gemini_error(status, &response.meta)),
                     }
                 }
@@ -932,7 +953,16 @@ impl GemView {
                 Response::Success(content) => {
                     viewer.process_gemini_response_success(&content, &url);
                 }
-                Response::Redirect(_s) => {}
+                Response::Redirect(target) => {
+                    viewer.fail_load(
+                        &url.to_string(),
+                        format!("The page redirects to {target}, outside Gemini"),
+                    );
+                    viewer.emit_by_name::<()>(
+                        "request-cross-protocol-redirect",
+                        &[&url.to_string(), &target],
+                    );
+                }
                 Response::CertificateChanged {
                     host,
                     fingerprint,
@@ -945,11 +975,72 @@ impl GemView {
                         &[&host, &fingerprint, &expires, &url.to_string()],
                     );
                 }
+                Response::CertificateRequired {
+                    host,
+                    url: final_url,
+                    meta,
+                    code,
+                } => {
+                    let status = gemini::protocol::StatusCode::ClientCertRequired(code % 10);
+                    viewer.fail_load(&final_url, gemini_error(status, &meta));
+                    let has_cert = Url::parse(&final_url)
+                        .is_ok_and(|u| viewer.client_certificate_scope(&u).is_some());
+                    viewer.emit_by_name::<()>(
+                        "certificate-required",
+                        &[&host, &meta, &code, &has_cert, &final_url],
+                    );
+                }
                 Response::Error(estr) => {
                     viewer.fail_load(&url.to_string(), estr);
                 }
             },
         );
+    }
+
+    pub fn server_certificate(&self, url: &Url) -> Option<(String, i64)> {
+        let key = format!("{}:{}", url.host_str()?, url.port().unwrap_or(1965));
+        gemini::tofu::KnownHosts::load(&PathBuf::from(self.known_hosts()))
+            .get(&key)
+            .map(|c| (c.fingerprint.clone(), c.expires))
+    }
+
+    pub fn client_certificate_scope(&self, url: &Url) -> Option<String> {
+        gemini::certificate::find(url, &PathBuf::from(self.client_certs()))
+            .map(|(scope, _)| scope.to_string())
+    }
+
+    /// # Errors
+    /// Returns an error if the certificate cannot be generated or written
+    pub fn create_client_certificate(
+        &self,
+        url: &Url,
+        whole_site: bool,
+    ) -> Result<(), gemini::certificate::Error> {
+        let scope = if whole_site {
+            gemini::certificate::Scope::site(url)
+        } else {
+            gemini::certificate::Scope::from_url(url)
+        }
+        .ok_or(gemini::certificate::Error::InvalidUrl)?;
+        gemini::certificate::generate(&scope, &PathBuf::from(self.client_certs())).map(|_| ())
+    }
+
+    /// # Errors
+    /// Returns an error if the certificate cannot be generated or written
+    pub fn replace_client_certificate(&self, url: &Url) -> Result<(), gemini::certificate::Error> {
+        let dir = PathBuf::from(self.client_certs());
+        let scope = match gemini::certificate::find(url, &dir) {
+            Some((scope, _)) => scope,
+            None => gemini::certificate::Scope::from_url(url)
+                .ok_or(gemini::certificate::Error::InvalidUrl)?,
+        };
+        gemini::certificate::generate(&scope, &dir).map(|_| ())
+    }
+
+    /// # Errors
+    /// Returns an error if the certificate file cannot be removed
+    pub fn remove_client_certificate(&self, url: &Url) -> std::io::Result<()> {
+        gemini::certificate::remove(url, &PathBuf::from(self.client_certs()))
     }
 
     /// # Errors
@@ -1203,6 +1294,35 @@ impl GemView {
             let expires = values[3].get::<i64>().unwrap();
             let url = values[4].get::<String>().unwrap();
             f(&obj, host, fingerprint, expires, url);
+            None
+        })
+    }
+
+    pub fn connect_request_cross_protocol_redirect<F: Fn(&Self, String, String) + 'static>(
+        &self,
+        f: F,
+    ) -> glib::SignalHandlerId {
+        self.connect_local("request-cross-protocol-redirect", true, move |values| {
+            let obj = values[0].get::<Self>().unwrap();
+            let from = values[1].get::<String>().unwrap();
+            let to = values[2].get::<String>().unwrap();
+            f(&obj, from, to);
+            None
+        })
+    }
+
+    pub fn connect_certificate_required<F: Fn(&Self, String, String, u8, bool, String) + 'static>(
+        &self,
+        f: F,
+    ) -> glib::SignalHandlerId {
+        self.connect_local("certificate-required", true, move |values| {
+            let obj = values[0].get::<Self>().unwrap();
+            let host = values[1].get::<String>().unwrap();
+            let meta = values[2].get::<String>().unwrap();
+            let code = values[3].get::<u8>().unwrap();
+            let has_cert = values[4].get::<bool>().unwrap();
+            let url = values[5].get::<String>().unwrap();
+            f(&obj, host, meta, code, has_cert, url);
             None
         })
     }

@@ -34,6 +34,8 @@ pub struct GemView {
     #[property(get, set)]
     pub(crate) known_hosts: RefCell<String>,
     #[property(get, set)]
+    pub(crate) client_certs: RefCell<String>,
+    #[property(get, set)]
     pub(crate) paragraph_tag: RefCell<gtk::TextTag>,
     #[property(get, set)]
     pub(crate) h1_tag: RefCell<gtk::TextTag>,
@@ -73,6 +75,8 @@ impl ObjectImpl for GemView {
         *self.history.borrow_mut() = History::default();
         let known_hosts = glib::user_data_dir().join("gemview").join("known_hosts");
         obj.set_known_hosts(known_hosts.to_string_lossy().into_owned());
+        let client_certs = glib::user_data_dir().join("gemview").join("client_certs");
+        obj.set_client_certs(client_certs.to_string_lossy().into_owned());
         let buffer = gtk::prelude::TextViewExt::buffer(&*obj);
         let mut font = FontDescription::new();
         font.set_family("Sans");
@@ -180,7 +184,7 @@ impl ObjectImpl for GemView {
                     .param_types([glib::Type::STRING, glib::Type::STRING])
                     .build(),
                 Signal::builder("request-input-sensitive")
-                    .param_types([glib::Type::STRING])
+                    .param_types([glib::Type::STRING, glib::Type::STRING])
                     .build(),
                 Signal::builder("request-upload")
                     .param_types([glib::Type::STRING])
@@ -190,6 +194,18 @@ impl ObjectImpl for GemView {
                         glib::Type::STRING,
                         glib::Type::STRING,
                         glib::Type::I64,
+                        glib::Type::STRING,
+                    ])
+                    .build(),
+                Signal::builder("request-cross-protocol-redirect")
+                    .param_types([glib::Type::STRING, glib::Type::STRING])
+                    .build(),
+                Signal::builder("certificate-required")
+                    .param_types([
+                        glib::Type::STRING,
+                        glib::Type::STRING,
+                        glib::Type::U8,
+                        glib::Type::BOOL,
                         glib::Type::STRING,
                     ])
                     .build(),

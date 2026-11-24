@@ -208,9 +208,11 @@ impl Gui {
                     Some(&format!(
                         "The certificate presented by {host} does not match the one \
                         trusted previously. The server may have renewed it, or the \
-                        connection may be intercepted.\n\nNew fingerprint (SHA-256):\n{fingerprint}\n\nExpires: {expiry}"
+                        connection may be intercepted.\n\nNew fingerprint (SHA-256):\n{}\n\nExpires: {expiry}",
+                        tab::format_fingerprint(&fingerprint)
                     )),
                 );
+                dlg.set_body_use_markup(true);
                 dlg.add_responses(&[("cancel", "Cancel"), ("trust", "Trust New Certificate")]);
                 dlg.set_response_appearance("trust", adw::ResponseAppearance::Destructive);
                 dlg.set_default_response(Some("cancel"));

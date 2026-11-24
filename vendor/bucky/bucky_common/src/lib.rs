@@ -61,6 +61,12 @@ pub enum Response {
         fingerprint: String,
         expires: i64,
     },
+    CertificateRequired {
+        host: String,
+        url: String,
+        meta: String,
+        code: u8,
+    },
     Error(String),
 }
 
@@ -81,6 +87,7 @@ pub enum RequestError {
     ResponseParseError(ResponseParseError),
     /// Occurs if the request path is not valid
     InvalidPath,
+    UrlTooLong,
     CertificateChanged {
         host: String,
         fingerprint: String,
@@ -108,6 +115,9 @@ impl std::fmt::Display for RequestError {
             }
             Self::InvalidPath => {
                 write!(f, "Invalid Path")
+            }
+            Self::UrlTooLong => {
+                write!(f, "The address is longer than the 1024 bytes Gemini allows")
             }
             Self::CertificateChanged { host, .. } => {
                 write!(f, "The certificate for {host} has changed")

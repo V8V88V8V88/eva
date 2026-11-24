@@ -12,6 +12,7 @@ pub struct Controls {
     pub addr_bar: TemplateChild<gtk::Entry>,
     #[template_child]
     pub bookmark_button: TemplateChild<gtk::MenuButton>,
+    pub site_popover: std::cell::OnceCell<gtk::Popover>,
 }
 
 #[glib::object_subclass]
@@ -53,6 +54,17 @@ impl ObjectImpl for Controls {
             move |_| EntryExt::set_alignment(&entry, 0.5)
         ));
         self.addr_bar.add_controller(focus);
+        let popover = gtk::Popover::builder()
+            .position(gtk::PositionType::Bottom)
+            .build();
+        popover.set_parent(&*self.addr_bar);
+        _ = self.site_popover.set(popover);
+    }
+
+    fn dispose(&self) {
+        if let Some(popover) = self.site_popover.get() {
+            popover.unparent();
+        }
     }
 }
 

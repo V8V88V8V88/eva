@@ -37,13 +37,13 @@ that when Eva sees an official release it will be a polished user experience.
    - [x] user specified colors
  - [x] back-forward list
  - [x] history
- - [ ] Gemini protocol
+ - [x] Gemini protocol
    - [x] Render gmi pages
    - [x] Display text
    - [x] Display images
    - [x] View gemtext source
    - [x] Tofu
-   - [ ] Client certificates
+   - [x] Client certificates
    - [x] Send user input
    - [x] Sensitive user input
    - [x] Downloads

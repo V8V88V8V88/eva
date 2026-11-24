@@ -6,6 +6,7 @@ pub use {bookmark_editor::BookmarkEditor, controls::Controls, input::Input};
 use {
     super::uri,
     crate::{BOOKMARKS, CONFIG, HISTORY, PRIVATE},
+    adw::prelude::{AdwDialogExt, AlertDialogExt, AlertDialogExtManual},
     gemview::GemView,
     gtk::{glib::clone, prelude::*},
     std::{
@@ -74,6 +75,12 @@ impl Default for Tab {
                 .to_string_lossy()
                 .into_owned(),
         );
+        viewer.set_client_certs(
+            crate::history::get_data_dir()
+                .join("client_certs")
+                .to_string_lossy()
+                .into_owned(),
+        );
         viewer.set_margin_start(25);
         viewer.set_margin_end(25);
         viewer.set_margin_top(25);
@@ -96,6 +103,81 @@ impl Default for Tab {
     }
 }
 
+pub fn format_fingerprint(fingerprint: &str) -> String {
+    let lines: Vec<String> = fingerprint
+        .as_bytes()
+        .chunks(32)
+        .map(|line| {
+            line.chunks(4)
+                .map(|g| String::from_utf8_lossy(g).into_owned())
+                .collect::<Vec<_>>()
+                .join(" ")
+        })
+        .collect();
+    format!(
+        "<tt>{}</tt>",
+        gtk::glib::markup_escape_text(&lines.join("\n"))
+    )
+}
+
+fn insecure_scheme(scheme: &str) -> bool {
+    matches!(scheme, "gopher" | "finger" | "spartan" | "mercury")
+}
+
+fn scheme_name(scheme: &str) -> String {
+    let mut chars = scheme.chars();
+    chars
+        .next()
+        .map(|c| c.to_uppercase().chain(chars).collect())
+        .unwrap_or_default()
+}
+
+fn status_row(icon: &str, heading: &str) -> gtk::Box {
+    let row = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+    row.append(&gtk::Image::from_icon_name(icon));
+    row.append(
+        &gtk::Label::builder()
+            .label(heading)
+            .css_classes(["heading"])
+            .build(),
+    );
+    row
+}
+
+fn info_label(markup: &str, selectable: bool) -> gtk::Label {
+    gtk::Label::builder()
+        .label(markup)
+        .use_markup(true)
+        .wrap(true)
+        .max_width_chars(40)
+        .xalign(0.0)
+        .selectable(selectable)
+        .css_classes(["dim-label"])
+        .build()
+}
+
+fn site_info_box(host: &str, icon: &str, heading: &str, text: &str) -> gtk::Box {
+    let content = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(8)
+        .margin_top(6)
+        .margin_bottom(6)
+        .margin_start(6)
+        .margin_end(6)
+        .build();
+    content.append(
+        &gtk::Label::builder()
+            .label(host)
+            .css_classes(["title-4"])
+            .xalign(0.0)
+            .margin_bottom(4)
+            .build(),
+    );
+    content.append(&status_row(icon, heading));
+    content.append(&info_label(&gtk::glib::markup_escape_text(text), false));
+    content
+}
+
 impl Tab {
     pub fn init() -> Self {
         let tab = Self::default();
@@ -112,6 +194,37 @@ impl Tab {
                 let mut uri = String::from(bar.text());
                 uri = uri::uri(&mut uri);
                 tab.viewer.visit(&uri);
+            }
+        ));
+        self.controls.addr_bar().connect_icon_press(clone!(
+            #[strong(rename_to = tab)]
+            self,
+            move |_, pos| {
+                if pos == gtk::EntryIconPosition::Primary {
+                    tab.site_info();
+                }
+            }
+        ));
+        self.viewer.connect_page_loaded(clone!(
+            #[strong(rename_to = tab)]
+            self,
+            move |_, _| tab.update_site_icon()
+        ));
+        self.viewer.connect_page_load_started(clone!(
+            #[strong(rename_to = tab)]
+            self,
+            move |_, _| tab.controls.set_site_icon(controls::SiteState::None)
+        ));
+        self.viewer.connect_request_cross_protocol_redirect(clone!(
+            #[strong(rename_to = tab)]
+            self,
+            move |_, from, to| tab.confirm_cross_protocol_redirect(&from, to)
+        ));
+        self.viewer.connect_certificate_required(clone!(
+            #[strong(rename_to = tab)]
+            self,
+            move |_, host, meta, code, has_cert, url| {
+                tab.certificate_required(&host, &meta, code, has_cert, url);
             }
         ));
         self.viewer.connect_page_load_redirect(clone!(
@@ -175,6 +288,268 @@ impl Tab {
                 dlg.hide();
             }
         ));
+    }
+
+    pub fn update_site_icon(&self) {
+        let state = match Url::parse(&self.viewer.uri()) {
+            Ok(url) if url.scheme() == "gemini" => {
+                if self.viewer.client_certificate_scope(&url).is_some() {
+                    controls::SiteState::Identified
+                } else {
+                    controls::SiteState::Verified
+                }
+            }
+            Ok(url) if insecure_scheme(url.scheme()) => controls::SiteState::Insecure,
+            _ => controls::SiteState::None,
+        };
+        self.controls.set_site_icon(state);
+    }
+
+    fn after_certificate_change(viewer: &GemView, url: &Url, result: Result<(), String>) {
+        match result {
+            Ok(()) => viewer.visit(url.as_str()),
+            Err(e) => eprintln!("Error updating client certificate for {url}: {e}"),
+        }
+    }
+
+    fn certificate_required(&self, host: &str, meta: &str, code: u8, has_cert: bool, url: String) {
+        let Ok(url) = Url::parse(&url) else {
+            return;
+        };
+        let meta = meta.trim();
+        let reason = if meta.is_empty() {
+            String::new()
+        } else {
+            format!("\n\nThe server says: “{meta}”")
+        };
+        let viewer = self.viewer.clone();
+        let dlg = if has_cert {
+            let problem = match code {
+                61 => "is not authorised to view this page. The certificate itself may \
+                    still be accepted elsewhere on the server",
+                62 => "was not accepted as valid",
+                _ => "was not accepted",
+            };
+            let dlg = adw::AlertDialog::new(
+                Some("Certificate Rejected"),
+                Some(&format!(
+                    "The client certificate you use on {host} {problem} (status {code}).\
+                    {reason}\n\nReplacing it gives you a new identity on this server."
+                )),
+            );
+            dlg.add_responses(&[
+                ("cancel", "Cancel"),
+                ("remove", "Remove"),
+                ("replace", "Replace"),
+            ]);
+            dlg.set_response_appearance("remove", adw::ResponseAppearance::Destructive);
+            dlg.connect_response(None, clone!(
+                #[strong(rename_to = tab)]
+                self,
+                move |_, response| match response {
+                    "remove" => {
+                        if let Err(e) = viewer.remove_client_certificate(&url) {
+                            eprintln!("Error removing client certificate for {url}: {e}");
+                        }
+                        tab.update_site_icon();
+                    }
+                    "replace" => Self::after_certificate_change(
+                        &viewer,
+                        &url,
+                        viewer.replace_client_certificate(&url).map_err(|e| e.to_string()),
+                    ),
+                    _ => {}
+                }
+            ));
+            dlg
+        } else {
+            let dlg = adw::AlertDialog::new(
+                Some("Client Certificate Required"),
+                Some(&format!(
+                    "{host} asks for a client certificate to identify you.{reason}\n\n\
+                    Eva can create one for this page and the pages below it, or for \
+                    the whole site. The server will recognise you by it on later visits."
+                )),
+            );
+            dlg.add_responses(&[
+                ("cancel", "Cancel"),
+                ("site", "Whole Site"),
+                ("page", "This Page"),
+            ]);
+            dlg.set_response_appearance("page", adw::ResponseAppearance::Suggested);
+            dlg.connect_response(None, move |_, response| {
+                let whole_site = match response {
+                    "page" => false,
+                    "site" => true,
+                    _ => return,
+                };
+                Self::after_certificate_change(
+                    &viewer,
+                    &url,
+                    viewer
+                        .create_client_certificate(&url, whole_site)
+                        .map_err(|e| e.to_string()),
+                );
+            });
+            dlg
+        };
+        dlg.set_default_response(Some("cancel"));
+        dlg.set_close_response("cancel");
+        dlg.present(Some(&self.viewer));
+    }
+
+    fn site_info(&self) {
+        let Ok(url) = Url::parse(&self.viewer.uri()) else {
+            return;
+        };
+        let content = if url.scheme() == "gemini" {
+            self.gemini_site_info(&url)
+        } else if insecure_scheme(url.scheme()) {
+            site_info_box(
+                url.host_str().unwrap_or_default(),
+                "security-low-symbolic",
+                "Not Encrypted",
+                &format!(
+                    "{} pages are sent as plain text. Anyone on the network can read \
+                    what you view and send here.",
+                    scheme_name(url.scheme())
+                ),
+            )
+        } else {
+            return;
+        };
+        self.controls.show_site_popover(&content);
+    }
+
+    fn gemini_site_info(&self, url: &Url) -> gtk::Box {
+        let host = url.host_str().unwrap_or_default();
+        let content = match self.viewer.server_certificate(url) {
+            Some((fingerprint, expires)) => {
+                let content = site_info_box(
+                    host,
+                    "security-high-symbolic",
+                    "Verified Connection",
+                    "The server certificate matches the one trusted on your first visit.",
+                );
+                let expiry = chrono::DateTime::from_timestamp(expires, 0).map_or_else(
+                    || String::from("unknown"),
+                    |d| d.format("%Y-%m-%d").to_string(),
+                );
+                content.append(&info_label(
+                    &format!("{}\nExpires {expiry}", format_fingerprint(&fingerprint)),
+                    true,
+                ));
+                content
+            }
+            None => site_info_box(
+                host,
+                "security-high-symbolic",
+                "Encrypted Connection",
+                "No server certificate has been recorded for this site yet.",
+            ),
+        };
+        content.append(&gtk::Separator::new(gtk::Orientation::Horizontal));
+        let scope = self.viewer.client_certificate_scope(url);
+        let (heading, text) = match &scope {
+            Some(scope) => (
+                "Identified",
+                format!(
+                    "You use a client certificate on\n<tt>{}</tt>\nand the pages below it.",
+                    gtk::glib::markup_escape_text(scope)
+                ),
+            ),
+            None => (
+                "Anonymous",
+                String::from("You are not using a client certificate on this site."),
+            ),
+        };
+        content.append(&status_row("avatar-default-symbolic", heading));
+        content.append(&info_label(&text, true));
+        let button = gtk::Button::builder()
+            .label(if scope.is_some() {
+                "Remove Certificate…"
+            } else {
+                "Create Certificate for Site"
+            })
+            .halign(gtk::Align::Start)
+            .css_classes(["flat"])
+            .build();
+        let url = url.clone();
+        let has_cert = scope.is_some();
+        button.connect_clicked(clone!(
+            #[strong(rename_to = tab)]
+            self,
+            move |_| {
+                tab.controls.hide_site_popover();
+                if has_cert {
+                    tab.confirm_remove_certificate(&url);
+                } else {
+                    Self::after_certificate_change(
+                        &tab.viewer,
+                        &url,
+                        tab.viewer
+                            .create_client_certificate(&url, true)
+                            .map_err(|e| e.to_string()),
+                    );
+                }
+            }
+        ));
+        content.append(&button);
+        content
+    }
+
+    fn confirm_remove_certificate(&self, url: &Url) {
+        let host = url.host_str().unwrap_or_default();
+        let dlg = adw::AlertDialog::new(
+            Some("Remove Client Certificate?"),
+            Some(&format!(
+                "{host} will no longer recognise you. This cannot be undone."
+            )),
+        );
+        dlg.add_responses(&[("cancel", "Cancel"), ("remove", "Remove")]);
+        dlg.set_response_appearance("remove", adw::ResponseAppearance::Destructive);
+        dlg.set_default_response(Some("cancel"));
+        dlg.set_close_response("cancel");
+        let url = url.clone();
+        dlg.connect_response(Some("remove"), clone!(
+            #[strong(rename_to = tab)]
+            self,
+            move |_, _| {
+                if let Err(e) = tab.viewer.remove_client_certificate(&url) {
+                    eprintln!("Error removing client certificate for {url}: {e}");
+                }
+                tab.viewer.reload();
+            }
+        ));
+        dlg.present(Some(&self.viewer));
+    }
+
+    fn confirm_cross_protocol_redirect(&self, from: &str, to: String) {
+        let host = Url::parse(from)
+            .ok()
+            .and_then(|u| u.host_str().map(str::to_string))
+            .unwrap_or_default();
+        let scheme = to.split_once(':').map_or("", |(s, _)| s);
+        let warning = if insecure_scheme(scheme) || scheme == "http" {
+            "\n\nThis connection will not be encrypted."
+        } else {
+            ""
+        };
+        let dlg = adw::AlertDialog::new(
+            Some("Leave Gemini?"),
+            Some(&format!(
+                "{host} is redirecting to\n<tt>{}</tt>{warning}",
+                gtk::glib::markup_escape_text(&to)
+            )),
+        );
+        dlg.set_body_use_markup(true);
+        dlg.add_responses(&[("cancel", "Cancel"), ("open", "Open")]);
+        dlg.set_response_appearance("open", adw::ResponseAppearance::Suggested);
+        dlg.set_default_response(Some("cancel"));
+        dlg.set_close_response("cancel");
+        let viewer = self.viewer.clone();
+        dlg.connect_response(Some("open"), move |_, _| viewer.visit(&to));
+        dlg.present(Some(&self.viewer));
     }
 
     pub fn request_input(&self, meta: &str, url: String, visibility: bool) {
@@ -373,5 +748,17 @@ impl Tab {
             self.viewer.render_text(&content);
             self.controls.set_uri("eva://source");
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn fingerprint_is_grouped() {
+        let fp = "f357075437397896e31d320a3830d75637d627e824688b9660804d163e35f1f9";
+        assert_eq!(
+            super::format_fingerprint(fp),
+            "<tt>f357 0754 3739 7896 e31d 320a 3830 d756\n37d6 27e8 2468 8b96 6080 4d16 3e35 f1f9</tt>"
+        );
     }
 }

@@ -54,6 +54,11 @@ impl KnownHosts {
     }
 
     #[must_use]
+    pub fn get(&self, host: &str) -> Option<&Certificate> {
+        self.hosts.get(host)
+    }
+
+    #[must_use]
     pub fn check(&self, host: &str, cert: &Certificate) -> Trust {
         self.check_at(host, cert, now())
     }

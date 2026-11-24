@@ -22,6 +22,13 @@ Contents
 * Gemini - Ask before trusting a changed server certificate
 * Gemini - Stop following redirects after five hops
 * Gemini - Follow relative redirects
+* Gemini - Fix crash on sensitive input requests
+* Gemini - Load pages from servers that close the connection without TLS close_notify
+* Gemini - Client certificates, scoped to a page and the pages below it or to a whole site, created only with your consent
+* Gemini - Replace or remove a client certificate when a server rejects it
+* Gemini - Ask before following a redirect out of Gemini
+* Gemini - Refuse addresses longer than the 1024 bytes the protocol allows
+* Site information popover in the address bar: verified server certificate and client identity for Gemini, a warning for unencrypted protocols
 * Fall back to other resolved addresses when a connection fails
 * Use the libadwaita About dialog
 

@@ -4,11 +4,11 @@
 //!
 
 use super::{
-    protocol,
+    certificate, protocol,
     tofu::{Certificate, KnownHosts, Trust},
 };
 use common::RequestError;
-use native_tls::TlsConnector;
+use native_tls::{Protocol, TlsConnector};
 use url::Url;
 
 use std::convert::TryFrom;
@@ -75,8 +75,17 @@ fn use_stream_do_request(req: &str, stream: &mut dyn std::io::Write) -> Result<(
 /// Use a stream `std::io::Read` to read a response and parse that response
 fn use_stream_get_resp(stream: &mut dyn std::io::Read) -> Result<protocol::Response, RequestError> {
     let mut buffer: Vec<u8> = Vec::new();
-    stream.read_to_end(&mut buffer)?;
+    match stream.read_to_end(&mut buffer) {
+        Err(e) if is_missing_close_notify(&e) && buffer.contains(&b'\n') => {}
+        Err(e) => return Err(e.into()),
+        Ok(_) => {}
+    }
     parse_merc_gemini_resp(&buffer)
+}
+
+fn is_missing_close_notify(e: &std::io::Error) -> bool {
+    e.kind() == std::io::ErrorKind::UnexpectedEof
+        || e.to_string().to_lowercase().contains("unexpected eof")
 }
 
 /// Parse a response taken from a server
@@ -88,16 +97,33 @@ fn parse_merc_gemini_resp(resp: &[u8]) -> Result<protocol::Response, RequestErro
 }
 
 /// Make a request to a gemini server
-fn make_gemini_request(url: &Url, known_hosts: &Path) -> Result<protocol::Response, RequestError> {
+fn make_gemini_request(
+    url: &Url,
+    known_hosts: &Path,
+    cert_dir: Option<&Path>,
+) -> Result<protocol::Response, RequestError> {
     let request = Request::from(url);
+    if request.raw_string.len() > 1024 + 2 {
+        return Err(RequestError::UrlTooLong);
+    }
     let port = url.port().unwrap_or(1965);
-    let connector = TlsConnector::builder()
+    let host = url.host_str().unwrap_or("");
+    let mut builder = TlsConnector::builder();
+    builder
+        .min_protocol_version(Some(Protocol::Tlsv12))
         .danger_accept_invalid_hostnames(true)
-        .danger_accept_invalid_certs(true)
+        .danger_accept_invalid_certs(true);
+    if let Some(dir) = cert_dir {
+        if let Some(identity) = certificate::load(url, dir)
+            .map_err(|e| RequestError::TlsError(format!("Client certificate: {e}")))?
+        {
+            builder.identity(identity);
+        }
+    }
+    let connector = builder
         .build()
         .map_err(|e| RequestError::TlsError(format!("{e:?}")))?;
     let tcp_stream = open_tcp_stream(url, port)?;
-    let host = url.host_str().unwrap_or("");
     let mut tls_stream = connector
         .connect(host, tcp_stream)
         .map_err(|e| RequestError::TlsError(format!("{e:?}")))?;
@@ -144,14 +170,18 @@ fn make_mercury_request(url: &Url) -> Result<protocol::Response, RequestError> {
 /// # fn main() -> Result<(), common::RequestError> {
 /// use std::convert::TryFrom;
 /// let url = Url::parse("gemini://gemini.circumlunar.space/").unwrap();
-/// let response = request::request(&url, std::path::Path::new("known_hosts"))?;
+/// let response = request::request(&url, std::path::Path::new("known_hosts"), None)?;
 /// assert_eq!(response.status, StatusCode::Success(0));
 /// # Ok(())
 /// # }
 /// ```
-pub fn request(url: &Url, known_hosts: &Path) -> Result<protocol::Response, RequestError> {
+pub fn request(
+    url: &Url,
+    known_hosts: &Path,
+    cert_dir: Option<&Path>,
+) -> Result<protocol::Response, RequestError> {
     match url.scheme() {
-        "gemini" => make_gemini_request(url, known_hosts),
+        "gemini" => make_gemini_request(url, known_hosts, cert_dir),
         "mercury" => make_mercury_request(url),
         s => Err(RequestError::UnknownScheme(String::from(s))),
     }
@@ -162,9 +192,16 @@ mod tests {
     use super::*;
     use std::convert::TryFrom;
     #[test]
+    fn url_over_1024_bytes_is_refused() {
+        let long = format!("gemini://example.invalid/?{}", "a".repeat(1024));
+        let err = request(&Url::parse(&long).unwrap(), Path::new("known_hosts"), None).unwrap_err();
+        assert!(matches!(err, RequestError::UrlTooLong));
+    }
+
+    #[test]
     fn make_request_invalid_scheme_error() {
         let raw_url = Url::try_from("https://example.com").unwrap();
-        let response = request(&raw_url, Path::new("known_hosts")).unwrap_err();
+        let response = request(&raw_url, Path::new("known_hosts"), None).unwrap_err();
         match response {
             RequestError::UnknownScheme(s) => {
                 assert_eq!(s, "https");
