@@ -616,6 +616,7 @@ pub fn run() {
         a == "--private" || (a.starts_with('-') && !a.starts_with("--") && a.contains('p'))
     });
     PRIVATE.store(private, std::sync::atomic::Ordering::Relaxed);
+    gtk::gio::resources_register_include!("eva.gresource").expect("Failed to register resources");
     let mut flags = gtk::gio::ApplicationFlags::HANDLES_OPEN;
     if private {
         flags |= gtk::gio::ApplicationFlags::NON_UNIQUE;
@@ -655,6 +656,7 @@ pub fn run() {
         if let Err(e) = adw::init() {
             eprintln!("Failed to initialize libadwaita: {e}");
         }
+        gtk::Window::set_default_icon_name("eva");
     });
 
     match application.register(Some(&Cancellable::new())) {

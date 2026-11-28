@@ -47,3 +47,6 @@ features = ["derive"]
 lto = true
 codegen-units = 1
 strip = true
+
+[build-dependencies]
+glib-build-tools = "0.22"

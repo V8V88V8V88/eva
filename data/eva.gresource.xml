@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gresources>
+  <gresource prefix="/org/hitchhiker-linux/eva/icons/scalable/apps">
+    <file preprocess="xml-stripblanks">eva.svg</file>
+  </gresource>
+</gresources>
